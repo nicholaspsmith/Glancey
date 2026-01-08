@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { EmbeddingBackend } from '../embeddings/index.js';
 import { ASTChunker } from './ast-chunker.js';
+import { loadConfig, getDefaultPatterns, getDefaultExcludePatterns, type LanceContextConfig } from '../config.js';
 
 export interface CodeChunk {
   id: string;
@@ -47,6 +48,7 @@ export class CodeIndexer {
   private embeddingBackend: EmbeddingBackend;
   private indexPath: string;
   private projectPath: string;
+  private config: LanceContextConfig | null = null;
 
   constructor(projectPath: string, embeddingBackend: EmbeddingBackend) {
     this.projectPath = projectPath;
@@ -56,6 +58,8 @@ export class CodeIndexer {
 
   async initialize(): Promise<void> {
     this.db = await lancedb.connect(this.indexPath);
+    this.config = await loadConfig(this.projectPath);
+    console.error(`[lance-context] Loaded config with ${this.config.patterns?.length} patterns`);
   }
 
   /**
@@ -172,18 +176,22 @@ export class CodeIndexer {
   }
 
   async indexCodebase(
-    patterns: string[] = ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', '**/*.py', '**/*.go', '**/*.rs'],
-    excludePatterns: string[] = ['**/node_modules/**', '**/dist/**', '**/.git/**', '**/build/**'],
+    patterns?: string[],
+    excludePatterns?: string[],
     forceReindex: boolean = false
   ): Promise<{ filesIndexed: number; chunksCreated: number; incremental: boolean }> {
     const { glob } = await import('glob');
 
+    // Use provided patterns or fall back to config/defaults
+    const effectivePatterns = patterns || this.config?.patterns || getDefaultPatterns();
+    const effectiveExcludePatterns = excludePatterns || this.config?.excludePatterns || getDefaultExcludePatterns();
+
     // Find all matching files
     const files: string[] = [];
-    for (const pattern of patterns) {
+    for (const pattern of effectivePatterns) {
       const matches = await glob(pattern, {
         cwd: this.projectPath,
-        ignore: excludePatterns,
+        ignore: effectiveExcludePatterns,
         absolute: true,
       });
       files.push(...matches);
