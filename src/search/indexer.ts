@@ -21,6 +21,17 @@ export interface IndexStatus {
   chunkCount: number;
   lastUpdated: string | null;
   indexPath: string;
+  embeddingBackend?: string;
+  embeddingModel?: string;
+}
+
+interface IndexMetadata {
+  lastUpdated: string;
+  fileCount: number;
+  chunkCount: number;
+  embeddingBackend: string;
+  embeddingModel?: string;
+  version: string;
 }
 
 interface FileMetadata {
@@ -69,6 +80,37 @@ export class CodeIndexer {
     this.db = await lancedb.connect(this.indexPath);
     this.config = await loadConfig(this.projectPath);
     console.error(`[lance-context] Loaded config with ${this.config.patterns?.length} patterns`);
+  }
+
+  private get metadataPath(): string {
+    return path.join(this.indexPath, 'index-metadata.json');
+  }
+
+  /**
+   * Save index metadata to disk
+   */
+  private async saveIndexMetadata(fileCount: number, chunkCount: number): Promise<void> {
+    const metadata: IndexMetadata = {
+      lastUpdated: new Date().toISOString(),
+      fileCount,
+      chunkCount,
+      embeddingBackend: this.embeddingBackend.name,
+      version: '1.0.0',
+    };
+
+    await fs.writeFile(this.metadataPath, JSON.stringify(metadata, null, 2));
+  }
+
+  /**
+   * Load index metadata from disk
+   */
+  private async loadIndexMetadata(): Promise<IndexMetadata | null> {
+    try {
+      const content = await fs.readFile(this.metadataPath, 'utf-8');
+      return JSON.parse(content) as IndexMetadata;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -175,12 +217,16 @@ export class CodeIndexer {
     this.table = await this.db!.openTable('code_chunks');
     const count = await this.table.countRows();
 
+    // Load persisted metadata
+    const metadata = await this.loadIndexMetadata();
+
     return {
       indexed: true,
-      fileCount: 0, // Would need to query distinct files
+      fileCount: metadata?.fileCount ?? 0,
       chunkCount: count,
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: metadata?.lastUpdated ?? null,
       indexPath: this.indexPath,
+      embeddingBackend: metadata?.embeddingBackend,
     };
   }
 
@@ -280,6 +326,9 @@ export class CodeIndexer {
     // Save file metadata for future incremental indexing
     await this.saveFileMetadata(files);
 
+    // Save index metadata
+    await this.saveIndexMetadata(files.length, allChunks.length);
+
     return {
       filesIndexed: files.length,
       chunksCreated: allChunks.length,
@@ -363,6 +412,9 @@ export class CodeIndexer {
     await this.saveFileMetadata(allCurrentFiles);
 
     const totalChunks = await this.table.countRows();
+
+    // Save index metadata
+    await this.saveIndexMetadata(allCurrentFiles.length, totalChunks);
 
     return {
       filesIndexed: filesToProcess.length,
