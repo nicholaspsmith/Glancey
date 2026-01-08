@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.svg" alt="lance-context logo" width="150" height="150">
+</p>
+
 # lance-context
 
 An MCP plugin that adds semantic code search to Claude Code and other AI coding agents, giving them deep context from your entire codebase.
