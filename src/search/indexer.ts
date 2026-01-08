@@ -463,16 +463,73 @@ export class CodeIndexer {
 
     const queryEmbedding = await this.embeddingBackend.embed(query);
 
-    const results = await this.table!.search(queryEmbedding).limit(limit).toArray();
+    // Fetch more results than needed for re-ranking
+    const fetchLimit = Math.min(limit * 3, 50);
+    const results = await this.table!.search(queryEmbedding).limit(fetchLimit).toArray();
 
-    return results.map((r) => ({
-      id: r.id,
-      filePath: r.filePath,
-      content: r.content,
-      startLine: r.startLine,
-      endLine: r.endLine,
-      language: r.language,
+    // Hybrid scoring: combine semantic similarity with keyword matching
+    const scoredResults = results.map((r, index) => {
+      // Semantic score: inverse of rank (higher is better)
+      const semanticScore = 1 - index / fetchLimit;
+
+      // Keyword score: based on query term matches
+      const keywordScore = this.calculateKeywordScore(query, r.content, r.filePath);
+
+      // Combined score (weighted: 70% semantic, 30% keyword)
+      const combinedScore = 0.7 * semanticScore + 0.3 * keywordScore;
+
+      return { result: r, score: combinedScore };
+    });
+
+    // Sort by combined score and take top results
+    scoredResults.sort((a, b) => b.score - a.score);
+
+    return scoredResults.slice(0, limit).map((sr) => ({
+      id: sr.result.id,
+      filePath: sr.result.filePath,
+      content: sr.result.content,
+      startLine: sr.result.startLine,
+      endLine: sr.result.endLine,
+      language: sr.result.language,
     }));
+  }
+
+  /**
+   * Calculate keyword match score for hybrid search
+   */
+  private calculateKeywordScore(query: string, content: string, filePath: string): number {
+    const queryTerms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+    if (queryTerms.length === 0) return 0;
+
+    const contentLower = content.toLowerCase();
+    const filePathLower = filePath.toLowerCase();
+
+    let matchCount = 0;
+    let exactMatchBonus = 0;
+
+    for (const term of queryTerms) {
+      // Check content matches
+      if (contentLower.includes(term)) {
+        matchCount++;
+
+        // Bonus for exact word match (not just substring)
+        const wordBoundaryRegex = new RegExp(`\\b${term}\\b`, 'i');
+        if (wordBoundaryRegex.test(content)) {
+          exactMatchBonus += 0.5;
+        }
+      }
+
+      // Bonus for filename/path match
+      if (filePathLower.includes(term)) {
+        matchCount += 0.5;
+      }
+    }
+
+    // Normalize score to 0-1 range
+    const baseScore = matchCount / queryTerms.length;
+    const bonusScore = Math.min(exactMatchBonus / queryTerms.length, 0.5);
+
+    return Math.min(baseScore + bonusScore, 1);
   }
 
   async clearIndex(): Promise<void> {
