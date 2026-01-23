@@ -44,6 +44,7 @@ export function getDashboardHTML(): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>lance-context Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/charts.css/dist/charts.min.css">
   <style>
     :root {
       /* Light theme */
@@ -375,56 +376,61 @@ export function getDashboardHTML(): string {
       animation: pulse 2s ease-in-out infinite;
     }
 
-    /* Command Usage Chart Styles */
-    .usage-chart {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+    /* Charts.css Customization */
+    .charts-css {
+      --color-1: #58a6ff;
+      --color-2: #3fb950;
+      --color-3: #a371f7;
+      --color-4: #f85149;
+      --color-5: #d29922;
     }
 
-    .usage-bar-container {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+    #usage-chart {
+      height: 200px;
+      max-width: 100%;
+      margin: 0;
     }
 
-    .usage-bar-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    #usage-chart tbody tr {
+      height: 32px;
+    }
+
+    #usage-chart td {
+      border-radius: 4px;
+      transition: all 0.3s ease;
+    }
+
+    #usage-chart .bar::after {
+      content: attr(data-count);
+      position: absolute;
+      right: 8px;
+      color: var(--text-primary);
       font-size: 12px;
-    }
-
-    .usage-bar-label {
-      color: var(--text-secondary);
       font-weight: 500;
     }
 
-    .usage-bar-count {
-      color: var(--text-muted);
-      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
     }
 
-    .usage-bar-track {
-      height: 24px;
-      background-color: var(--bg-tertiary);
-      border-radius: 4px;
-      overflow: hidden;
-      position: relative;
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
     }
 
-    .usage-bar-fill {
-      height: 100%;
-      border-radius: 4px;
-      transition: width 0.5s ease;
-      min-width: 2px;
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
     }
-
-    .usage-bar-fill.search { background: linear-gradient(90deg, #58a6ff, #388bfd); }
-    .usage-bar-fill.index { background: linear-gradient(90deg, #3fb950, #2ea043); }
-    .usage-bar-fill.status { background: linear-gradient(90deg, #a371f7, #8957e5); }
-    .usage-bar-fill.clear { background: linear-gradient(90deg, #f85149, #da3633); }
-    .usage-bar-fill.instructions { background: linear-gradient(90deg, #d29922, #bb8009); }
 
     .usage-total {
       display: flex;
@@ -432,7 +438,7 @@ export function getDashboardHTML(): string {
       align-items: center;
       padding-top: 12px;
       border-top: 1px solid var(--border-color);
-      margin-top: 4px;
+      margin-top: 16px;
     }
 
     .usage-total-label {
@@ -449,6 +455,144 @@ export function getDashboardHTML(): string {
     }
 
     .usage-empty {
+      text-align: center;
+      padding: 20px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    /* Beads Section Styles */
+    .beads-section {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .beads-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .beads-logo {
+      width: 24px;
+      height: 24px;
+    }
+
+    .beads-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .beads-unavailable {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .beads-stats {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+
+    .beads-stat {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .beads-stat-value {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .beads-stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .beads-issues {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .beads-issue {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px;
+      background-color: var(--bg-tertiary);
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+    }
+
+    .beads-issue-id {
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      font-size: 12px;
+      color: var(--accent-blue);
+      white-space: nowrap;
+    }
+
+    .beads-issue-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .beads-issue-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .beads-issue-meta {
+      display: flex;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .beads-issue-type {
+      display: inline-flex;
+      padding: 2px 6px;
+      background-color: var(--bg-secondary);
+      border-radius: 4px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .beads-issue-priority {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .priority-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .priority-1 { background-color: var(--accent-red); }
+    .priority-2 { background-color: var(--accent-yellow); }
+    .priority-3 { background-color: var(--accent-green); }
+
+    .beads-daemon-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 12px;
+    }
+
+    .beads-empty {
       text-align: center;
       padding: 20px;
       color: var(--text-muted);
@@ -568,8 +712,76 @@ export function getDashboardHTML(): string {
           <span class="card-title">Command Usage</span>
           <span class="badge" id="sessionBadge">This Session</span>
         </div>
-        <div class="usage-chart" id="usageChart">
-          <div class="usage-empty">No commands executed yet</div>
+        <div id="usageChartContainer">
+          <div class="usage-empty" id="usageEmpty">No commands executed yet</div>
+          <table class="charts-css bar show-labels labels-align-start" id="usage-chart" style="display: none;">
+            <tbody id="usageChartBody"></tbody>
+          </table>
+          <div class="chart-legend" id="chartLegend" style="display: none;">
+            <div class="legend-item"><span class="legend-color" style="background: #58a6ff;"></span>Search Code</div>
+            <div class="legend-item"><span class="legend-color" style="background: #3fb950;"></span>Index Codebase</div>
+            <div class="legend-item"><span class="legend-color" style="background: #a371f7;"></span>Get Status</div>
+            <div class="legend-item"><span class="legend-color" style="background: #f85149;"></span>Clear Index</div>
+            <div class="legend-item"><span class="legend-color" style="background: #d29922;"></span>Get Instructions</div>
+          </div>
+          <div class="usage-total" id="usageTotal" style="display: none;">
+            <span class="usage-total-label">Total Commands</span>
+            <span class="usage-total-count" id="totalCount">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Beads Section -->
+    <div class="container beads-section" id="beadsSection" style="display: none;">
+      <div class="beads-header">
+        <svg class="beads-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="5" r="3"/>
+          <circle cx="12" cy="12" r="3"/>
+          <circle cx="12" cy="19" r="3"/>
+          <line x1="12" y1="8" x2="12" y2="9"/>
+          <line x1="12" y1="15" x2="12" y2="16"/>
+        </svg>
+        <span class="beads-title">Beads Issue Tracker</span>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Status</span>
+            <span class="badge success" id="beadsBadge">Active</span>
+          </div>
+          <div class="beads-stats">
+            <div class="beads-stat">
+              <span class="beads-stat-value" id="beadsReadyCount">0</span>
+              <span class="beads-stat-label">Ready</span>
+            </div>
+            <div class="beads-stat">
+              <span class="beads-stat-value" id="beadsOpenCount">0</span>
+              <span class="beads-stat-label">Open</span>
+            </div>
+            <div class="beads-stat">
+              <span class="beads-stat-value" id="beadsTotalCount">0</span>
+              <span class="beads-stat-label">Total</span>
+            </div>
+          </div>
+          <div class="beads-daemon-status" id="beadsDaemonStatus">
+            <div class="status-dot" id="beadsDaemonDot"></div>
+            <span id="beadsDaemonText">Daemon status unknown</span>
+          </div>
+          <div class="stat" style="margin-top: 12px;" id="beadsSyncBranchStat">
+            <div class="stat-label">Sync Branch</div>
+            <div class="stat-value small" id="beadsSyncBranch">-</div>
+          </div>
+        </div>
+
+        <div class="card" style="grid-column: span 2;">
+          <div class="card-header">
+            <span class="card-title">Ready Tasks</span>
+            <span class="badge" id="readyTasksBadge">0 tasks</span>
+          </div>
+          <div class="beads-issues" id="beadsIssuesList">
+            <div class="beads-empty">No ready tasks</div>
+          </div>
         </div>
       </div>
     </div>
@@ -700,50 +912,117 @@ export function getDashboardHTML(): string {
       progressText.textContent = progress.message;
     }
 
-    // Command bar CSS class mapping
-    const commandBarClass = {
-      'search_code': 'search',
-      'index_codebase': 'index',
-      'get_index_status': 'status',
-      'clear_index': 'clear',
-      'get_project_instructions': 'instructions'
+    // Charts.css color mapping
+    const commandColors = {
+      'search_code': '#58a6ff',
+      'index_codebase': '#3fb950',
+      'get_index_status': '#a371f7',
+      'clear_index': '#f85149',
+      'get_project_instructions': '#d29922'
     };
 
-    // Update usage chart
-    const usageChart = document.getElementById('usageChart');
+    // Update usage chart using charts.css
+    const usageEmpty = document.getElementById('usageEmpty');
+    const usageChartEl = document.getElementById('usage-chart');
+    const usageChartBody = document.getElementById('usageChartBody');
+    const chartLegend = document.getElementById('chartLegend');
+    const usageTotal = document.getElementById('usageTotal');
+    const totalCount = document.getElementById('totalCount');
 
     function updateUsage(data) {
       const { usage, total } = data;
 
       if (total === 0) {
-        usageChart.innerHTML = '<div class="usage-empty">No commands executed yet</div>';
+        usageEmpty.style.display = 'block';
+        usageChartEl.style.display = 'none';
+        chartLegend.style.display = 'none';
+        usageTotal.style.display = 'none';
         return;
       }
+
+      usageEmpty.style.display = 'none';
+      usageChartEl.style.display = 'block';
+      chartLegend.style.display = 'flex';
+      usageTotal.style.display = 'flex';
 
       const maxCount = Math.max(...usage.map(u => u.count));
 
       let html = '';
       for (const item of usage) {
-        const percent = maxCount > 0 ? (item.count / maxCount) * 100 : 0;
-        const barClass = commandBarClass[item.command] || 'search';
+        const percent = maxCount > 0 ? (item.count / maxCount) : 0;
+        const color = commandColors[item.command] || '#58a6ff';
 
-        html += '<div class="usage-bar-container">';
-        html += '<div class="usage-bar-header">';
-        html += '<span class="usage-bar-label">' + escapeHtml(item.label) + '</span>';
-        html += '<span class="usage-bar-count">' + item.count + '</span>';
-        html += '</div>';
-        html += '<div class="usage-bar-track">';
-        html += '<div class="usage-bar-fill ' + barClass + '" style="width: ' + percent + '%"></div>';
-        html += '</div>';
-        html += '</div>';
+        html += '<tr>';
+        html += '<th scope="row">' + escapeHtml(item.label) + '</th>';
+        html += '<td style="--size: ' + percent + '; --color: ' + color + ';" data-count="' + item.count + '"></td>';
+        html += '</tr>';
       }
 
-      html += '<div class="usage-total">';
-      html += '<span class="usage-total-label">Total Commands</span>';
-      html += '<span class="usage-total-count">' + total + '</span>';
-      html += '</div>';
+      usageChartBody.innerHTML = html;
+      totalCount.textContent = total;
+    }
 
-      usageChart.innerHTML = html;
+    // Beads section elements
+    const beadsSection = document.getElementById('beadsSection');
+    const beadsReadyCount = document.getElementById('beadsReadyCount');
+    const beadsOpenCount = document.getElementById('beadsOpenCount');
+    const beadsTotalCount = document.getElementById('beadsTotalCount');
+    const beadsDaemonDot = document.getElementById('beadsDaemonDot');
+    const beadsDaemonText = document.getElementById('beadsDaemonText');
+    const beadsSyncBranch = document.getElementById('beadsSyncBranch');
+    const beadsIssuesList = document.getElementById('beadsIssuesList');
+    const readyTasksBadge = document.getElementById('readyTasksBadge');
+
+    function updateBeads(data) {
+      if (!data.available) {
+        beadsSection.style.display = 'none';
+        return;
+      }
+
+      beadsSection.style.display = 'block';
+      beadsReadyCount.textContent = data.readyCount;
+      beadsOpenCount.textContent = data.openCount;
+      beadsTotalCount.textContent = data.issueCount;
+      readyTasksBadge.textContent = data.readyCount + ' task' + (data.readyCount !== 1 ? 's' : '');
+
+      // Daemon status
+      if (data.daemonRunning) {
+        beadsDaemonDot.className = 'status-dot connected';
+        beadsDaemonText.textContent = 'Daemon running';
+      } else {
+        beadsDaemonDot.className = 'status-dot';
+        beadsDaemonText.textContent = 'Daemon not running';
+      }
+
+      // Sync branch
+      beadsSyncBranch.textContent = data.syncBranch || 'Not configured';
+
+      // Issues list
+      if (data.issues && data.issues.length > 0) {
+        let html = '';
+        for (const issue of data.issues) {
+          html += '<div class="beads-issue">';
+          html += '<span class="beads-issue-id">' + escapeHtml(issue.id) + '</span>';
+          html += '<div class="beads-issue-content">';
+          html += '<div class="beads-issue-title">' + escapeHtml(issue.title) + '</div>';
+          html += '<div class="beads-issue-meta">';
+          if (issue.issue_type) {
+            html += '<span class="beads-issue-type">' + escapeHtml(issue.issue_type) + '</span>';
+          }
+          if (issue.priority) {
+            html += '<span class="beads-issue-priority">';
+            html += '<span class="priority-dot priority-' + issue.priority + '"></span>';
+            html += 'P' + issue.priority;
+            html += '</span>';
+          }
+          html += '</div>';
+          html += '</div>';
+          html += '</div>';
+        }
+        beadsIssuesList.innerHTML = html;
+      } else {
+        beadsIssuesList.innerHTML = '<div class="beads-empty">No ready tasks</div>';
+      }
     }
 
     // Escape HTML to prevent XSS
@@ -756,10 +1035,11 @@ export function getDashboardHTML(): string {
     // Fetch initial data
     async function fetchData() {
       try {
-        const [statusRes, configRes, usageRes] = await Promise.all([
+        const [statusRes, configRes, usageRes, beadsRes] = await Promise.all([
           fetch('/api/status'),
           fetch('/api/config'),
-          fetch('/api/usage')
+          fetch('/api/usage'),
+          fetch('/api/beads')
         ]);
 
         if (statusRes.ok) {
@@ -775,6 +1055,11 @@ export function getDashboardHTML(): string {
         if (usageRes.ok) {
           const usage = await usageRes.json();
           updateUsage(usage);
+        }
+
+        if (beadsRes.ok) {
+          const beads = await beadsRes.json();
+          updateBeads(beads);
         }
       } catch (error) {
         console.error('Failed to fetch data:', error);
