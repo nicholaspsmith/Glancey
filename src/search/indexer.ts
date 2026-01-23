@@ -33,6 +33,18 @@ export interface CodeChunk {
   language: string;
   /** Vector embedding for semantic search (populated during indexing) */
   embedding?: number[];
+  /** Type of code symbol (function, class, method, etc.) - from AST chunking */
+  symbolType?:
+    | 'function'
+    | 'class'
+    | 'method'
+    | 'interface'
+    | 'type'
+    | 'variable'
+    | 'import'
+    | 'other';
+  /** Name of the code symbol (e.g., 'UserService', 'MyClass.constructor') - from AST chunking */
+  symbolName?: string;
 }
 
 /**
@@ -695,6 +707,8 @@ export class CodeIndexer {
       startLine: chunk.startLine,
       endLine: chunk.endLine,
       language,
+      symbolType: chunk.type,
+      symbolName: chunk.name,
     }));
   }
 
@@ -716,6 +730,8 @@ export class CodeIndexer {
       startLine: chunk.startLine,
       endLine: chunk.endLine,
       language,
+      symbolType: chunk.type,
+      symbolName: chunk.name,
     }));
   }
 
@@ -897,6 +913,8 @@ export class CodeIndexer {
       startLine: sr.result.startLine,
       endLine: sr.result.endLine,
       language: sr.result.language,
+      symbolType: sr.result.symbolType,
+      symbolName: sr.result.symbolName,
     }));
   }
 
@@ -1036,6 +1054,8 @@ export class CodeIndexer {
         endLine: r.endLine,
         language: r.language,
         similarity,
+        symbolType: r.symbolType,
+        symbolName: r.symbolName,
       });
 
       if (scoredResults.length >= limit) {
