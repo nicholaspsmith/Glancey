@@ -27,14 +27,16 @@ describe('Dashboard Server', () => {
 
   describe('startServer', () => {
     it('should start server on available port', async () => {
-      server = await startServer();
+      // Use a unique port range for this test to avoid conflicts with parallel tests
+      const port = await findAvailablePort(27000);
+      server = await startServer(port);
 
-      expect(server.port).toBeGreaterThanOrEqual(24300);
+      expect(server.port).toBeGreaterThanOrEqual(27000);
       expect(server.url).toBe(`http://127.0.0.1:${server.port}`);
     });
 
     it('should start server on specified port', async () => {
-      const port = await findAvailablePort(25000);
+      const port = await findAvailablePort(28000);
       server = await startServer(port);
 
       expect(server.port).toBe(port);
@@ -42,7 +44,8 @@ describe('Dashboard Server', () => {
     });
 
     it('should respond to requests', async () => {
-      server = await startServer();
+      const port = await findAvailablePort(29000);
+      server = await startServer(port);
 
       const response = await fetch(`${server.url}/api/heartbeat`);
       expect(response.ok).toBe(true);
