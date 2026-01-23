@@ -32,6 +32,12 @@ export interface EmbeddingBackend {
    * @returns The number of dimensions in the embedding vectors
    */
   getDimensions(): number;
+
+  /**
+   * Get the model identifier used by this backend.
+   * @returns The model name/identifier (e.g., 'nomic-embed-text', 'jina-embeddings-v3')
+   */
+  getModel(): string;
 }
 
 /**

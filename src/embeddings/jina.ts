@@ -76,4 +76,8 @@ export class JinaBackend implements EmbeddingBackend {
   getDimensions(): number {
     return this.dimensions;
   }
+
+  getModel(): string {
+    return this.model;
+  }
 }

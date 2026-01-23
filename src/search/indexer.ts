@@ -213,6 +213,7 @@ export class CodeIndexer {
       fileCount,
       chunkCount,
       embeddingBackend: this.embeddingBackend.name,
+      embeddingModel: this.embeddingBackend.getModel(),
       embeddingDimensions: this.embeddingBackend.getDimensions(),
       version: '1.0.0',
     };
@@ -334,6 +335,7 @@ export class CodeIndexer {
         lastUpdated: null,
         indexPath: this.indexPath,
         embeddingBackend: this.embeddingBackend.name,
+        embeddingModel: this.embeddingBackend.getModel(),
       };
     }
 
@@ -350,6 +352,7 @@ export class CodeIndexer {
       lastUpdated: metadata?.lastUpdated ?? null,
       indexPath: this.indexPath,
       embeddingBackend: metadata?.embeddingBackend ?? this.embeddingBackend.name,
+      embeddingModel: metadata?.embeddingModel ?? this.embeddingBackend.getModel(),
     };
   }
 
@@ -395,21 +398,33 @@ export class CodeIndexer {
     const tableNames = await this.db!.tableNames();
     const hasExistingIndex = tableNames.includes('code_chunks');
 
-    // Check for embedding dimension mismatch
-    let dimensionMismatch = false;
+    // Check for embedding dimension or model mismatch
+    let embeddingMismatch = false;
     if (hasExistingIndex && !forceReindex) {
       const metadata = await this.loadIndexMetadata();
       const currentDimensions = this.embeddingBackend.getDimensions();
+      const currentModel = this.embeddingBackend.getModel();
+
+      // Check dimension mismatch
       if (metadata?.embeddingDimensions && metadata.embeddingDimensions !== currentDimensions) {
         console.error(
           `[lance-context] Embedding dimension mismatch: index has ${metadata.embeddingDimensions}, ` +
             `current backend (${this.embeddingBackend.name}) uses ${currentDimensions}. Forcing full reindex.`
         );
-        dimensionMismatch = true;
+        embeddingMismatch = true;
+      }
+
+      // Check model mismatch (even if dimensions match, different models produce incompatible embeddings)
+      if (metadata?.embeddingModel && metadata.embeddingModel !== currentModel) {
+        console.error(
+          `[lance-context] Embedding model mismatch: index uses '${metadata.embeddingModel}', ` +
+            `current backend uses '${currentModel}'. Forcing full reindex.`
+        );
+        embeddingMismatch = true;
       }
     }
 
-    const canDoIncremental = hasExistingIndex && !forceReindex && !dimensionMismatch;
+    const canDoIncremental = hasExistingIndex && !forceReindex && !embeddingMismatch;
 
     if (canDoIncremental) {
       return this.indexIncremental(files, onProgress);
