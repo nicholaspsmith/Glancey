@@ -3,14 +3,51 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { exec } from 'child_process';
 import { createEmbeddingBackend } from './embeddings/index.js';
 import { CodeIndexer } from './search/indexer.js';
 import { isStringArray, isString, isNumber, isBoolean } from './utils/type-guards.js';
-import { loadConfig, getInstructions } from './config.js';
+import { loadConfig, getInstructions, getDashboardConfig } from './config.js';
+import { startDashboard, dashboardState, sseManager } from './dashboard/index.js';
+import type { CommandName } from './dashboard/index.js';
+
+/**
+ * Open a URL in the user's default browser (cross-platform)
+ */
+function openBrowser(url: string): void {
+  const platform = process.platform;
+  let command: string;
+
+  switch (platform) {
+    case 'darwin':
+      command = `open "${url}"`;
+      break;
+    case 'win32':
+      command = `start "" "${url}"`;
+      break;
+    default:
+      // Linux and others
+      command = `xdg-open "${url}"`;
+  }
+
+  exec(command, (error) => {
+    if (error) {
+      console.error('[lance-context] Failed to open browser:', error.message);
+    }
+  });
+}
 
 const PROJECT_PATH = process.env.LANCE_CONTEXT_PROJECT || process.cwd();
 
 let indexerPromise: Promise<CodeIndexer> | null = null;
+let configPromise: ReturnType<typeof loadConfig> | null = null;
+
+async function getConfig() {
+  if (!configPromise) {
+    configPromise = loadConfig(PROJECT_PATH);
+  }
+  return configPromise;
+}
 
 async function getIndexer(): Promise<CodeIndexer> {
   if (!indexerPromise) {
@@ -18,6 +55,13 @@ async function getIndexer(): Promise<CodeIndexer> {
       const backend = await createEmbeddingBackend();
       const idx = new CodeIndexer(PROJECT_PATH, backend);
       await idx.initialize();
+
+      // Share indexer and config with dashboard state
+      const config = await getConfig();
+      dashboardState.setIndexer(idx);
+      dashboardState.setConfig(config);
+      dashboardState.setProjectPath(PROJECT_PATH);
+
       return idx;
     })();
   }
@@ -116,6 +160,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
+  // Record command usage for dashboard
+  const validCommands: CommandName[] = [
+    'index_codebase',
+    'search_code',
+    'get_index_status',
+    'clear_index',
+    'get_project_instructions',
+  ];
+  if (validCommands.includes(name as CommandName)) {
+    dashboardState.recordCommandUsage(name as CommandName);
+  }
+
   try {
     const idx = await getIndexer();
 
@@ -126,7 +182,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ? args.excludePatterns
           : undefined;
         const forceReindex = isBoolean(args?.forceReindex) ? args.forceReindex : false;
-        const result = await idx.indexCodebase(patterns, excludePatterns, forceReindex);
+
+        // Notify dashboard of indexing start
+        dashboardState.onIndexingStart();
+
+        const result = await idx.indexCodebase(patterns, excludePatterns, forceReindex, (progress) => {
+          // Emit progress events to dashboard
+          dashboardState.onProgress(progress);
+        });
+
+        // Notify dashboard of indexing completion
+        dashboardState.onIndexingComplete(result);
+
         const mode = result.incremental ? 'Incremental update' : 'Full reindex';
         return {
           content: [
@@ -218,6 +285,68 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Start server
 async function main() {
+  // Load config to check if dashboard is enabled
+  const config = await getConfig();
+  const dashboardConfig = getDashboardConfig(config);
+
+  // Initialize the indexer eagerly so dashboard has data
+  let indexer: Awaited<ReturnType<typeof getIndexer>> | null = null;
+  try {
+    indexer = await getIndexer();
+  } catch (error) {
+    console.error('[lance-context] Failed to initialize indexer:', error);
+  }
+
+  // Auto-index if project is not yet indexed
+  if (indexer) {
+    const status = await indexer.getStatus();
+    if (!status.indexed) {
+      console.error('[lance-context] Project not indexed, starting auto-index...');
+      dashboardState.onIndexingStart();
+
+      // Run indexing in background so server can start immediately
+      indexer
+        .indexCodebase(undefined, undefined, false, (progress) => {
+          dashboardState.onProgress(progress);
+        })
+        .then((result) => {
+          dashboardState.onIndexingComplete(result);
+          console.error(
+            `[lance-context] Auto-index complete: ${result.filesIndexed} files, ${result.chunksCreated} chunks`
+          );
+        })
+        .catch((error) => {
+          console.error('[lance-context] Auto-index failed:', error);
+        });
+    }
+  }
+
+  // Start dashboard if enabled
+  if (dashboardConfig.enabled) {
+    try {
+      const dashboard = await startDashboard({
+        port: dashboardConfig.port,
+        config,
+        projectPath: PROJECT_PATH,
+      });
+      console.error(`[lance-context] Dashboard started at ${dashboard.url}`);
+
+      // Open dashboard in user's default browser if configured
+      // Wait briefly to see if there are already connected clients (existing tabs)
+      if (dashboardConfig.openBrowser) {
+        setTimeout(() => {
+          if (sseManager.getClientCount() === 0) {
+            openBrowser(dashboard.url);
+          } else {
+            console.error('[lance-context] Dashboard already open in browser, skipping');
+          }
+        }, 500);
+      }
+    } catch (error) {
+      console.error('[lance-context] Failed to start dashboard:', error);
+    }
+  }
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error('[lance-context] MCP server started');

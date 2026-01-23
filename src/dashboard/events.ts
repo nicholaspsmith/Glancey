@@ -1,0 +1,159 @@
+import type { ServerResponse } from 'http';
+import { dashboardState } from './state.js';
+
+/**
+ * Manages Server-Sent Events (SSE) connections for real-time updates.
+ */
+export class SSEManager {
+  private clients = new Set<ServerResponse>();
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    // Set up event listeners on dashboard state
+    this.setupEventListeners();
+  }
+
+  /**
+   * Set up listeners for dashboard state events
+   */
+  private setupEventListeners(): void {
+    dashboardState.on('progress', (progress) => {
+      this.broadcast('indexing:progress', progress);
+    });
+
+    dashboardState.on('indexing:start', () => {
+      this.broadcast('indexing:start', { timestamp: new Date().toISOString() });
+    });
+
+    dashboardState.on('indexing:complete', (result) => {
+      this.broadcast('indexing:complete', result);
+    });
+
+    dashboardState.on('status:change', (status) => {
+      this.broadcast('status:change', status);
+    });
+
+    dashboardState.on('usage:update', (usage) => {
+      this.broadcast('usage:update', usage);
+    });
+  }
+
+  /**
+   * Start sending heartbeat messages to keep connections alive
+   */
+  startHeartbeat(): void {
+    if (this.heartbeatInterval) return;
+
+    this.heartbeatInterval = setInterval(() => {
+      this.broadcast('heartbeat', { timestamp: new Date().toISOString() });
+    }, 30000); // Every 30 seconds
+  }
+
+  /**
+   * Stop the heartbeat interval
+   */
+  stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  /**
+   * Add a new SSE client connection
+   */
+  addClient(res: ServerResponse): void {
+    // Set SSE headers
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+
+    // Add to clients set
+    this.clients.add(res);
+
+    // Send initial connected event
+    this.sendToClient(res, 'connected', {
+      timestamp: new Date().toISOString(),
+      clientCount: this.clients.size,
+    });
+
+    // Send current indexing progress if in progress
+    if (dashboardState.isIndexingInProgress()) {
+      const lastProgress = dashboardState.getLastProgress();
+      if (lastProgress) {
+        this.sendToClient(res, 'indexing:progress', lastProgress);
+      }
+    }
+
+    // Handle client disconnect
+    res.on('close', () => {
+      this.clients.delete(res);
+    });
+  }
+
+  /**
+   * Send a message to a specific client
+   */
+  private sendToClient(res: ServerResponse, event: string, data: unknown): void {
+    if (res.writableEnded) return;
+
+    try {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    } catch {
+      // Client likely disconnected
+      this.clients.delete(res);
+    }
+  }
+
+  /**
+   * Broadcast an event to all connected clients
+   */
+  broadcast(event: string, data: unknown): void {
+    const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+
+    for (const client of this.clients) {
+      if (client.writableEnded) {
+        this.clients.delete(client);
+        continue;
+      }
+
+      try {
+        client.write(message);
+      } catch {
+        // Client likely disconnected
+        this.clients.delete(client);
+      }
+    }
+  }
+
+  /**
+   * Get the number of connected clients
+   */
+  getClientCount(): number {
+    return this.clients.size;
+  }
+
+  /**
+   * Close all client connections
+   */
+  closeAll(): void {
+    this.stopHeartbeat();
+    for (const client of this.clients) {
+      try {
+        client.end();
+      } catch {
+        // Ignore errors during cleanup
+      }
+    }
+    this.clients.clear();
+  }
+}
+
+/**
+ * Singleton instance of the SSE manager
+ */
+export const sseManager = new SSEManager();

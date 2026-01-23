@@ -20,18 +20,26 @@ const EmbeddingConfigSchema = z.object({
   model: z.string().optional(),
 });
 
+const DashboardConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  port: z.number().min(1024).max(65535).optional(),
+  openBrowser: z.boolean().optional(),
+});
+
 const ConfigSchema = z.object({
   patterns: z.array(z.string()).optional(),
   excludePatterns: z.array(z.string()).optional(),
   embedding: EmbeddingConfigSchema.optional(),
   chunking: ChunkingConfigSchema.optional(),
   search: SearchConfigSchema.optional(),
+  dashboard: DashboardConfigSchema.optional(),
   instructions: z.string().optional(),
 });
 
 export type LanceContextConfig = z.infer<typeof ConfigSchema>;
 export type ChunkingConfig = z.infer<typeof ChunkingConfigSchema>;
 export type SearchConfig = z.infer<typeof SearchConfigSchema>;
+export type DashboardConfig = z.infer<typeof DashboardConfigSchema>;
 
 const DEFAULT_PATTERNS = [
   '**/*.ts',
@@ -83,11 +91,21 @@ export const DEFAULT_SEARCH: Required<SearchConfig> = {
   keywordWeight: 0.3,
 };
 
+/**
+ * Default dashboard configuration
+ */
+export const DEFAULT_DASHBOARD: Required<DashboardConfig> = {
+  enabled: true,
+  port: 24300,
+  openBrowser: true,
+};
+
 export const DEFAULT_CONFIG: LanceContextConfig = {
   patterns: DEFAULT_PATTERNS,
   excludePatterns: DEFAULT_EXCLUDE_PATTERNS,
   chunking: DEFAULT_CHUNKING,
   search: DEFAULT_SEARCH,
+  dashboard: DEFAULT_DASHBOARD,
 };
 
 const CONFIG_FILENAMES = ['.lance-context.json', 'lance-context.config.json'];
@@ -122,6 +140,10 @@ export async function loadConfig(projectPath: string): Promise<LanceContextConfi
         search: {
           ...DEFAULT_SEARCH,
           ...userConfig.search,
+        },
+        dashboard: {
+          ...DEFAULT_DASHBOARD,
+          ...userConfig.dashboard,
         },
         instructions: userConfig.instructions,
       };
@@ -164,6 +186,16 @@ export function getSearchConfig(config: LanceContextConfig): Required<SearchConf
   return {
     ...DEFAULT_SEARCH,
     ...config.search,
+  };
+}
+
+/**
+ * Get dashboard config with defaults
+ */
+export function getDashboardConfig(config: LanceContextConfig): Required<DashboardConfig> {
+  return {
+    ...DEFAULT_DASHBOARD,
+    ...config.dashboard,
   };
 }
 
