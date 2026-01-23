@@ -11,6 +11,7 @@ import {
   getSearchConfig,
   type LanceContextConfig,
 } from '../config.js';
+import { minimatch } from 'minimatch';
 
 /**
  * Represents a chunk of code that has been indexed.
@@ -102,6 +103,20 @@ export interface SearchSimilarOptions {
 export interface SimilarCodeResult extends CodeChunk {
   /** Similarity score from 0 to 1 (1 = identical) */
   similarity: number;
+}
+
+/**
+ * Options for searching code.
+ */
+export interface SearchOptions {
+  /** Natural language query to search for */
+  query: string;
+  /** Maximum number of results to return (default: 10) */
+  limit?: number;
+  /** Glob pattern to filter results by file path (e.g., "src/\**", "!test/\**") */
+  pathPattern?: string;
+  /** Filter results to specific languages (e.g., ["typescript", "javascript"]) */
+  languages?: string[];
 }
 
 /**
@@ -745,7 +760,35 @@ export class CodeIndexer {
     return embedding;
   }
 
-  async search(query: string, limit: number = 10): Promise<CodeChunk[]> {
+  /**
+   * Check if a filepath matches a glob pattern.
+   * Supports negation patterns starting with '!'.
+   */
+  private matchesPathPattern(filepath: string, pattern: string): boolean {
+    // Handle negation pattern
+    if (pattern.startsWith('!')) {
+      return !minimatch(filepath, pattern.slice(1));
+    }
+    return minimatch(filepath, pattern);
+  }
+
+  /**
+   * Search with options object
+   */
+  async search(options: SearchOptions): Promise<CodeChunk[]>;
+  /**
+   * Search with query string and optional limit (backward compatible)
+   */
+  async search(query: string, limit?: number): Promise<CodeChunk[]>;
+  async search(queryOrOptions: string | SearchOptions, limit?: number): Promise<CodeChunk[]> {
+    // Normalize arguments
+    const options: SearchOptions =
+      typeof queryOrOptions === 'string'
+        ? { query: queryOrOptions, limit: limit ?? 10 }
+        : queryOrOptions;
+
+    const { query, limit: resultLimit = 10, pathPattern, languages } = options;
+
     if (!this.table) {
       const status = await this.getStatus();
       if (!status.indexed) {
@@ -756,12 +799,31 @@ export class CodeIndexer {
     const queryEmbedding = await this.getQueryEmbedding(query);
     const searchConfig = getSearchConfig(this.config!);
 
-    // Fetch more results than needed for re-ranking
-    const fetchLimit = Math.min(limit * 3, 50);
+    // Fetch more results than needed for re-ranking and filtering
+    // If we have filters, fetch even more to account for filtered-out results
+    const hasFilters = pathPattern !== undefined || (languages && languages.length > 0);
+    const fetchMultiplier = hasFilters ? 5 : 3;
+    const fetchLimit = Math.min(resultLimit * fetchMultiplier, hasFilters ? 100 : 50);
     const results = await this.table!.search(queryEmbedding).limit(fetchLimit).toArray();
 
+    // Apply filters
+    let filteredResults = results;
+
+    if (pathPattern) {
+      filteredResults = filteredResults.filter((r) =>
+        this.matchesPathPattern(r.filepath, pathPattern)
+      );
+    }
+
+    if (languages && languages.length > 0) {
+      const normalizedLanguages = languages.map((l) => l.toLowerCase());
+      filteredResults = filteredResults.filter((r) =>
+        normalizedLanguages.includes(r.language.toLowerCase())
+      );
+    }
+
     // Hybrid scoring: combine semantic similarity with keyword matching
-    const scoredResults = results.map((r, index) => {
+    const scoredResults = filteredResults.map((r, index) => {
       // Semantic score: inverse of rank (higher is better)
       const semanticScore = 1 - index / fetchLimit;
 
@@ -778,7 +840,7 @@ export class CodeIndexer {
     // Sort by combined score and take top results
     scoredResults.sort((a, b) => b.score - a.score);
 
-    return scoredResults.slice(0, limit).map((sr) => ({
+    return scoredResults.slice(0, resultLimit).map((sr) => ({
       id: sr.result.id,
       filepath: sr.result.filepath,
       content: sr.result.content,

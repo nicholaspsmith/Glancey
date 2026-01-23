@@ -324,6 +324,275 @@ describe('CodeIndexer', () => {
     });
   });
 
+  describe('search filtering', () => {
+    it('should filter results by pathPattern glob', async () => {
+      const mockTable = createMockTable([
+        {
+          id: 'src/utils.ts:1-10',
+          filepath: 'src/utils.ts',
+          content: 'export function utility() {}',
+          startLine: 1,
+          endLine: 10,
+          language: 'typescript',
+        },
+        {
+          id: 'test/utils.test.ts:1-10',
+          filepath: 'test/utils.test.ts',
+          content: 'describe("utility", () => {})',
+          startLine: 1,
+          endLine: 10,
+          language: 'typescript',
+        },
+        {
+          id: 'src/index.ts:1-10',
+          filepath: 'src/index.ts',
+          content: 'import { utility } from "./utils"',
+          startLine: 1,
+          endLine: 10,
+          language: 'typescript',
+        },
+      ]);
+      mockConnection.tableNames.mockResolvedValue(['code_chunks']);
+      mockConnection.openTable.mockResolvedValue(mockTable as any);
+      vi.mocked(fsPromises.readFile).mockRejectedValue(new Error('ENOENT'));
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      // Filter to only src directory
+      const results = await indexer.search({
+        query: 'utility',
+        pathPattern: 'src/**',
+      });
+
+      expect(results).toHaveLength(2);
+      expect(results.map((r) => r.filepath)).toEqual(['src/utils.ts', 'src/index.ts']);
+    });
+
+    it('should filter results by negation pathPattern', async () => {
+      const mockTable = createMockTable([
+        {
+          id: 'src/utils.ts:1-10',
+          filepath: 'src/utils.ts',
+          content: 'export function utility() {}',
+          startLine: 1,
+          endLine: 10,
+          language: 'typescript',
+        },
+        {
+          id: 'test/utils.test.ts:1-10',
+          filepath: 'test/utils.test.ts',
+          content: 'describe("utility", () => {})',
+          startLine: 1,
+          endLine: 10,
+          language: 'typescript',
+        },
+      ]);
+      mockConnection.tableNames.mockResolvedValue(['code_chunks']);
+      mockConnection.openTable.mockResolvedValue(mockTable as any);
+      vi.mocked(fsPromises.readFile).mockRejectedValue(new Error('ENOENT'));
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      // Exclude test files
+      const results = await indexer.search({
+        query: 'utility',
+        pathPattern: '!test/**',
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].filepath).toBe('src/utils.ts');
+    });
+
+    it('should filter results by languages array', async () => {
+      const mockTable = createMockTable([
+        {
+          id: 'app.ts:1-10',
+          filepath: 'app.ts',
+          content: 'const app = express()',
+          startLine: 1,
+          endLine: 10,
+          language: 'typescript',
+        },
+        {
+          id: 'app.js:1-10',
+          filepath: 'app.js',
+          content: 'const app = require("express")()',
+          startLine: 1,
+          endLine: 10,
+          language: 'javascript',
+        },
+        {
+          id: 'styles.css:1-10',
+          filepath: 'styles.css',
+          content: '.app { display: flex; }',
+          startLine: 1,
+          endLine: 10,
+          language: 'css',
+        },
+      ]);
+      mockConnection.tableNames.mockResolvedValue(['code_chunks']);
+      mockConnection.openTable.mockResolvedValue(mockTable as any);
+      vi.mocked(fsPromises.readFile).mockRejectedValue(new Error('ENOENT'));
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      // Filter to only TypeScript files
+      const results = await indexer.search({
+        query: 'app',
+        languages: ['typescript'],
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].language).toBe('typescript');
+    });
+
+    it('should filter by multiple languages', async () => {
+      const mockTable = createMockTable([
+        {
+          id: 'app.ts:1-10',
+          filepath: 'app.ts',
+          content: 'const app = express()',
+          startLine: 1,
+          endLine: 10,
+          language: 'typescript',
+        },
+        {
+          id: 'app.js:1-10',
+          filepath: 'app.js',
+          content: 'const app = require("express")()',
+          startLine: 1,
+          endLine: 10,
+          language: 'javascript',
+        },
+        {
+          id: 'styles.css:1-10',
+          filepath: 'styles.css',
+          content: '.app { display: flex; }',
+          startLine: 1,
+          endLine: 10,
+          language: 'css',
+        },
+      ]);
+      mockConnection.tableNames.mockResolvedValue(['code_chunks']);
+      mockConnection.openTable.mockResolvedValue(mockTable as any);
+      vi.mocked(fsPromises.readFile).mockRejectedValue(new Error('ENOENT'));
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      // Filter to TypeScript and JavaScript
+      const results = await indexer.search({
+        query: 'app',
+        languages: ['typescript', 'javascript'],
+      });
+
+      expect(results).toHaveLength(2);
+      expect(results.map((r) => r.language).sort()).toEqual(['javascript', 'typescript']);
+    });
+
+    it('should combine pathPattern and languages filters', async () => {
+      const mockTable = createMockTable([
+        {
+          id: 'src/app.ts:1-10',
+          filepath: 'src/app.ts',
+          content: 'const app = express()',
+          startLine: 1,
+          endLine: 10,
+          language: 'typescript',
+        },
+        {
+          id: 'src/app.js:1-10',
+          filepath: 'src/app.js',
+          content: 'const app = require("express")()',
+          startLine: 1,
+          endLine: 10,
+          language: 'javascript',
+        },
+        {
+          id: 'test/app.test.ts:1-10',
+          filepath: 'test/app.test.ts',
+          content: 'describe("app", () => {})',
+          startLine: 1,
+          endLine: 10,
+          language: 'typescript',
+        },
+      ]);
+      mockConnection.tableNames.mockResolvedValue(['code_chunks']);
+      mockConnection.openTable.mockResolvedValue(mockTable as any);
+      vi.mocked(fsPromises.readFile).mockRejectedValue(new Error('ENOENT'));
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      // Filter to src directory AND TypeScript only
+      const results = await indexer.search({
+        query: 'app',
+        pathPattern: 'src/**',
+        languages: ['typescript'],
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].filepath).toBe('src/app.ts');
+    });
+
+    it('should handle case-insensitive language filtering', async () => {
+      const mockTable = createMockTable([
+        {
+          id: 'app.ts:1-10',
+          filepath: 'app.ts',
+          content: 'const app = express()',
+          startLine: 1,
+          endLine: 10,
+          language: 'TypeScript',
+        },
+      ]);
+      mockConnection.tableNames.mockResolvedValue(['code_chunks']);
+      mockConnection.openTable.mockResolvedValue(mockTable as any);
+      vi.mocked(fsPromises.readFile).mockRejectedValue(new Error('ENOENT'));
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      // Use lowercase in filter
+      const results = await indexer.search({
+        query: 'app',
+        languages: ['typescript'],
+      });
+
+      expect(results).toHaveLength(1);
+    });
+
+    it('should support SearchOptions object syntax', async () => {
+      const mockTable = createMockTable([
+        {
+          id: 'test.ts:1-10',
+          filepath: 'test.ts',
+          content: 'function test() {}',
+          startLine: 1,
+          endLine: 10,
+          language: 'typescript',
+        },
+      ]);
+      mockConnection.tableNames.mockResolvedValue(['code_chunks']);
+      mockConnection.openTable.mockResolvedValue(mockTable as any);
+      vi.mocked(fsPromises.readFile).mockRejectedValue(new Error('ENOENT'));
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      // Use SearchOptions object
+      const results = await indexer.search({
+        query: 'test',
+        limit: 5,
+      });
+
+      expect(results).toHaveLength(1);
+    });
+  });
+
   describe('clearIndex', () => {
     it('should drop table when it exists', async () => {
       mockConnection.tableNames.mockResolvedValue(['code_chunks']);
