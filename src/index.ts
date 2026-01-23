@@ -294,12 +294,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             message: {
               type: 'string',
-              description: 'The commit message. Must be <=72 characters, imperative mood, single responsibility.',
+              description:
+                'The commit message. Must be <=72 characters, imperative mood, single responsibility.',
             },
             files: {
               type: 'array',
               items: { type: 'string' },
-              description: 'Files to stage before committing. If not provided, commits already-staged files.',
+              description:
+                'Files to stage before committing. If not provided, commits already-staged files.',
             },
           },
           required: ['message'],
@@ -503,7 +505,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const { stdout } = await execAsync('git branch --show-current', { cwd: PROJECT_PATH });
           currentBranch = stdout.trim();
           if (currentBranch === 'main' || currentBranch === 'master') {
-            errors.push(`Cannot commit directly to ${currentBranch}. Create a feature branch first:\n  git checkout -b feature/your-feature-name`);
+            errors.push(
+              `Cannot commit directly to ${currentBranch}. Create a feature branch first:\n  git checkout -b feature/your-feature-name`
+            );
           }
         } catch {
           errors.push('Failed to determine current branch. Are you in a git repository?');
@@ -516,13 +520,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         // Check 3: Imperative mood (heuristic - check for common past tense patterns)
-        const pastTensePatterns = /^(Added|Fixed|Updated|Changed|Removed|Implemented|Created|Deleted|Modified|Refactored|Merged)\b/i;
+        const pastTensePatterns =
+          /^(Added|Fixed|Updated|Changed|Removed|Implemented|Created|Deleted|Modified|Refactored|Merged)\b/i;
         if (pastTensePatterns.test(subjectLine)) {
-          warnings.push(`Subject may not be imperative mood. Use "Add" not "Added", "Fix" not "Fixed", etc.`);
+          warnings.push(
+            `Subject may not be imperative mood. Use "Add" not "Added", "Fix" not "Fixed", etc.`
+          );
         }
 
         // Check 4: Single responsibility (heuristic - check for "and" or multiple verbs)
-        const multiResponsibilityPatterns = /\b(and|,)\s+(add|fix|update|change|remove|implement|create|delete|modify|refactor)\b/i;
+        const multiResponsibilityPatterns =
+          /\b(and|,)\s+(add|fix|update|change|remove|implement|create|delete|modify|refactor)\b/i;
         if (multiResponsibilityPatterns.test(subjectLine)) {
           errors.push(`Message suggests multiple responsibilities. Split into separate commits.`);
         }
@@ -533,7 +541,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             content: [
               {
                 type: 'text',
-                text: `## Commit Blocked\n\n**Errors:**\n${errors.map(e => `- ${e}`).join('\n')}\n${warnings.length > 0 ? `\n**Warnings:**\n${warnings.map(w => `- ${w}`).join('\n')}` : ''}\n${COMMIT_RULES}`,
+                text: `## Commit Blocked\n\n**Errors:**\n${errors.map((e) => `- ${e}`).join('\n')}\n${warnings.length > 0 ? `\n**Warnings:**\n${warnings.map((w) => `- ${w}`).join('\n')}` : ''}\n${COMMIT_RULES}`,
               },
             ],
             isError: true,
@@ -543,7 +551,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Stage files if provided
         if (files.length > 0) {
           try {
-            const fileArgs = files.map(f => `"${f}"`).join(' ');
+            const fileArgs = files.map((f) => `"${f}"`).join(' ');
             await execAsync(`git add ${fileArgs}`, { cwd: PROJECT_PATH });
           } catch (e) {
             throw new Error(`Failed to stage files: ${e instanceof Error ? e.message : String(e)}`);
@@ -552,15 +560,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         // Check if there are staged changes
         try {
-          const { stdout } = await execAsync('git diff --cached --name-only', { cwd: PROJECT_PATH });
+          const { stdout } = await execAsync('git diff --cached --name-only', {
+            cwd: PROJECT_PATH,
+          });
           if (!stdout.trim()) {
-            throw new Error('No staged changes to commit. Stage files first or pass files parameter.');
+            throw new Error(
+              'No staged changes to commit. Stage files first or pass files parameter.'
+            );
           }
         } catch (e) {
           if (e instanceof Error && e.message.includes('No staged changes')) {
             throw e;
           }
-          throw new Error(`Failed to check staged changes: ${e instanceof Error ? e.message : String(e)}`);
+          throw new Error(
+            `Failed to check staged changes: ${e instanceof Error ? e.message : String(e)}`
+          );
         }
 
         // Build commit message with Co-Authored-By
@@ -575,7 +589,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
           let response = `## Commit Successful\n\n${stdout.trim()}`;
           if (warnings.length > 0) {
-            response += `\n\n**Warnings:**\n${warnings.map(w => `- ${w}`).join('\n')}`;
+            response += `\n\n**Warnings:**\n${warnings.map((w) => `- ${w}`).join('\n')}`;
           }
           response += `\n${COMMIT_RULES}`;
 
