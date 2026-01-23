@@ -9,28 +9,47 @@ An MCP plugin that adds semantic code search to Claude Code and other AI coding 
 ## Features
 
 - **Semantic Code Search**: Natural language queries locate relevant code across your entire codebase
-- **Multiple Embedding Backends**: Jina v3 API, local sentence-transformers, or Ollama
+- **Multiple Embedding Backends**: Jina v3 API or Ollama (local)
 - **LanceDB Vector Storage**: Fast, efficient vector search with hybrid BM25 + dense matching
 - **MCP Compatible**: Works with Claude Code, Cursor, and other MCP-compatible tools
+- **Web Dashboard**: Real-time monitoring of index status, configuration, and usage statistics
+- **Beads Integration**: Shows issue tracker data if your project uses [beads](https://github.com/steveyegge/beads)
 
 ## Installation
 
-### For Claude Code
-
-```bash
-claude mcp add lance-context -- npx lance-context
-```
-
-Or with a specific project path:
-
-```bash
-claude mcp add lance-context -- npx lance-context --project /path/to/your/project
-```
-
-### Manual Installation
+### Quick Install (Recommended)
 
 ```bash
 npm install -g lance-context
+```
+
+This automatically registers lance-context with Claude Code. Restart Claude Code to start using semantic search.
+
+### Manual Registration
+
+If automatic registration didn't work, manually add to Claude Code:
+
+```bash
+claude mcp add --scope user --transport stdio lance-context -- npx -y lance-context
+```
+
+### Verify Installation
+
+In Claude Code, run `/mcp` to see lance-context in the list of MCP servers.
+
+### Project-Level Installation
+
+For project-specific configuration, add a `.mcp.json` to your project root:
+
+```json
+{
+  "mcpServers": {
+    "lance-context": {
+      "command": "npx",
+      "args": ["-y", "lance-context"]
+    }
+  }
+}
 ```
 
 ## Architecture
@@ -169,6 +188,49 @@ Get project-specific instructions from the config:
 > get_project_instructions
 Use semantic search for exploring this codebase. Always run tests before committing.
 ```
+
+## Dashboard
+
+lance-context includes a web dashboard for monitoring index status and usage.
+
+### Accessing the Dashboard
+
+The dashboard starts automatically when the MCP server runs and is available at:
+
+```
+http://127.0.0.1:24300
+```
+
+The browser opens automatically on startup (configurable).
+
+### Dashboard Features
+
+- **Index Status**: Files indexed, chunks created, last updated time
+- **Embedding Backend**: Current backend and index path
+- **Configuration**: Project path, chunk settings, search weights
+- **File Patterns**: Include/exclude patterns being used
+- **Command Usage**: Real-time chart of MCP tool usage (using [charts.css](https://chartscss.org/))
+- **Beads Integration**: Issue tracker status and ready tasks (if beads is configured)
+
+### Dashboard Configuration
+
+Configure the dashboard in `.lance-context.json`:
+
+```json
+{
+  "dashboard": {
+    "enabled": true,
+    "port": 24300,
+    "openBrowser": true
+  }
+}
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `enabled` | Enable/disable the dashboard | `true` |
+| `port` | Port to run dashboard on | `24300` |
+| `openBrowser` | Auto-open browser on startup | `true` |
 
 ## How It Works
 
