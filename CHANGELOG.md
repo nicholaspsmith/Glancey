@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/nicholaspsmith/lance-context/compare/v1.0.0...v1.0.1) (2026-01-23)
+
+
+### Bug Fixes
+
+* **dashboard:** add all tools to usage tracking ([#39](https://github.com/nicholaspsmith/lance-context/issues/39)) ([ae1a0cb](https://github.com/nicholaspsmith/lance-context/commit/ae1a0cbaad4469b78bb6a6df7dfa3d84099571d0))
+
 # 1.0.0 (2026-01-23)
 
 
