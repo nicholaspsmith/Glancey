@@ -12,6 +12,7 @@ const execAsync = promisify(exec);
 import { createEmbeddingBackend } from './embeddings/index.js';
 import { CodeIndexer } from './search/indexer.js';
 import { isStringArray, isString, isNumber, isBoolean } from './utils/type-guards.js';
+import { logError, formatErrorResponse, wrapError, LanceContextError } from './utils/errors.js';
 import { loadConfig, getInstructions, getDashboardConfig } from './config.js';
 import {
   startDashboard,
@@ -376,7 +377,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'search_code': {
         const query = isString(args?.query) ? args.query : '';
         if (!query) {
-          throw new Error('query is required');
+          throw new LanceContextError('query is required', 'validation', { tool: 'search_code' });
         }
         const results = await idx.search({
           query,
@@ -484,7 +485,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const files = isStringArray(args?.files) ? args.files : [];
 
         if (!message) {
-          throw new Error('message is required');
+          throw new LanceContextError('message is required', 'validation', { tool: 'commit' });
         }
 
         // Commit rules to return with every response
@@ -561,7 +562,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const fileArgs = files.map((f) => `"${f}"`).join(' ');
             await execAsync(`git add ${fileArgs}`, { cwd: PROJECT_PATH });
           } catch (e) {
-            throw new Error(`Failed to stage files: ${e instanceof Error ? e.message : String(e)}`);
+            throw wrapError('Failed to stage files', 'git', e, { files });
           }
         }
 
@@ -571,17 +572,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             cwd: PROJECT_PATH,
           });
           if (!stdout.trim()) {
-            throw new Error(
-              'No staged changes to commit. Stage files first or pass files parameter.'
+            throw new LanceContextError(
+              'No staged changes to commit. Stage files first or pass files parameter.',
+              'git'
             );
           }
         } catch (e) {
-          if (e instanceof Error && e.message.includes('No staged changes')) {
+          if (e instanceof LanceContextError) {
             throw e;
           }
-          throw new Error(
-            `Failed to check staged changes: ${e instanceof Error ? e.message : String(e)}`
-          );
+          throw wrapError('Failed to check staged changes', 'git', e);
         }
 
         // Build commit message with Co-Authored-By
@@ -609,19 +609,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             ],
           };
         } catch (e) {
-          throw new Error(`Git commit failed: ${e instanceof Error ? e.message : String(e)}`);
+          throw wrapError('Git commit failed', 'git', e, { message });
         }
       }
 
       default:
-        throw new Error(`Unknown tool: ${name}`);
+        throw new LanceContextError(`Unknown tool: ${name}`, 'validation', { tool: name });
     }
   } catch (error) {
+    // Log full error details server-side for debugging
+    logError(error, name);
+
     return {
       content: [
         {
           type: 'text',
-          text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+          text: formatErrorResponse(error),
         },
       ],
       isError: true,
