@@ -728,7 +728,7 @@ export function getDashboardHTML(): string {
     </div>
 
     <!-- Beads Section -->
-    <div class="container beads-section" id="beadsSection" style="display: none;">
+    <div class="beads-section" id="beadsSection" style="display: none;">
       <div class="beads-header">
         <svg class="beads-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="5" r="3"/>
