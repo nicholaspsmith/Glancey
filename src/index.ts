@@ -323,6 +323,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     'get_index_status',
     'clear_index',
     'get_project_instructions',
+    'commit',
   ];
   if (validCommands.includes(name as CommandName)) {
     dashboardState.recordCommandUsage(name as CommandName);
