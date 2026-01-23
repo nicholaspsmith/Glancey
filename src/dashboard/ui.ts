@@ -910,10 +910,12 @@ export function getDashboardHTML(): string {
     // Charts.css color mapping
     const commandColors = {
       'search_code': '#58a6ff',
+      'search_similar': '#79c0ff',
       'index_codebase': '#3fb950',
       'get_index_status': '#a371f7',
       'clear_index': '#f85149',
-      'get_project_instructions': '#d29922'
+      'get_project_instructions': '#d29922',
+      'commit': '#56d364'
     };
 
     // Update usage chart using charts.css
