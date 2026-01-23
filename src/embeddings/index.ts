@@ -5,6 +5,7 @@ import { JinaBackend } from './jina.js';
 export * from './types.js';
 export { OllamaBackend } from './ollama.js';
 export { JinaBackend } from './jina.js';
+export { RateLimiter, type RateLimiterConfig } from './rate-limiter.js';
 
 /**
  * Create an embedding backend based on configuration and available credentials.
