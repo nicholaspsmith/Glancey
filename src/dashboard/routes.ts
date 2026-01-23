@@ -3,6 +3,7 @@ import { dashboardState } from './state.js';
 import { sseManager } from './events.js';
 import { getDashboardHTML } from './ui.js';
 import { getBeadsStatus } from './beads.js';
+import { saveEmbeddingSettings, getEmbeddingSettings, type EmbeddingSettings } from '../config.js';
 
 /**
  * Send a JSON response
@@ -124,21 +125,116 @@ async function handleBeads(_req: IncomingMessage, res: ServerResponse): Promise<
 }
 
 /**
- * Route dispatcher
+ * Handle GET /api/settings/embedding - Get current embedding settings
  */
-export async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
-  const path = url.pathname;
-  const method = req.method ?? 'GET';
-
-  // Only support GET requests
-  if (method !== 'GET') {
-    sendJSON(res, { error: 'Method not allowed' }, 405);
+async function handleGetEmbeddingSettings(
+  _req: IncomingMessage,
+  res: ServerResponse
+): Promise<void> {
+  const projectPath = dashboardState.getProjectPath();
+  if (!projectPath) {
+    sendJSON(res, { error: 'Project path not set' }, 503);
     return;
   }
 
   try {
-    switch (path) {
+    const settings = await getEmbeddingSettings(projectPath);
+    sendJSON(res, settings);
+  } catch (error) {
+    sendJSON(res, { error: String(error) }, 500);
+  }
+}
+
+/**
+ * Parse JSON body from request
+ */
+async function parseJsonBody(req: IncomingMessage): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        reject(new Error('Invalid JSON'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+/**
+ * Handle POST /api/settings/embedding - Save embedding settings
+ */
+async function handleSaveEmbeddingSettings(
+  req: IncomingMessage,
+  res: ServerResponse
+): Promise<void> {
+  const projectPath = dashboardState.getProjectPath();
+  if (!projectPath) {
+    sendJSON(res, { error: 'Project path not set' }, 503);
+    return;
+  }
+
+  try {
+    const body = (await parseJsonBody(req)) as EmbeddingSettings;
+
+    if (!body.backend || !['jina', 'ollama'].includes(body.backend)) {
+      sendJSON(res, { error: 'Invalid backend. Must be "jina" or "ollama".' }, 400);
+      return;
+    }
+
+    await saveEmbeddingSettings(projectPath, body);
+    sendJSON(res, {
+      success: true,
+      message: `Embedding backend set to ${body.backend}. Restart the MCP server for changes to take effect.`,
+    });
+  } catch (error) {
+    sendJSON(res, { error: String(error) }, 500);
+  }
+}
+
+/**
+ * Route dispatcher
+ */
+export async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+  const routePath = url.pathname;
+  const method = req.method ?? 'GET';
+
+  // Handle CORS preflight
+  if (method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    });
+    res.end();
+    return;
+  }
+
+  try {
+    // POST routes
+    if (method === 'POST') {
+      switch (routePath) {
+        case '/api/settings/embedding':
+          await handleSaveEmbeddingSettings(req, res);
+          return;
+        default:
+          sendJSON(res, { error: 'Method not allowed' }, 405);
+          return;
+      }
+    }
+
+    // GET routes
+    if (method !== 'GET') {
+      sendJSON(res, { error: 'Method not allowed' }, 405);
+      return;
+    }
+
+    switch (routePath) {
       case '/':
         await handleDashboard(req, res);
         break;
@@ -159,6 +255,9 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         break;
       case '/api/beads':
         await handleBeads(req, res);
+        break;
+      case '/api/settings/embedding':
+        await handleGetEmbeddingSettings(req, res);
         break;
       default:
         send404(res);

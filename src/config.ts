@@ -205,3 +205,105 @@ export function getDashboardConfig(config: LanceContextConfig): Required<Dashboa
 export function getInstructions(config: LanceContextConfig): string | undefined {
   return config.instructions;
 }
+
+/**
+ * Secrets stored separately from main config (should be gitignored)
+ */
+export interface LanceContextSecrets {
+  jinaApiKey?: string;
+}
+
+/**
+ * Load secrets from .lance-context/secrets.json
+ */
+export async function loadSecrets(projectPath: string): Promise<LanceContextSecrets> {
+  const secretsPath = path.join(projectPath, '.lance-context', 'secrets.json');
+  try {
+    const content = await fs.readFile(secretsPath, 'utf-8');
+    return JSON.parse(content) as LanceContextSecrets;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Save secrets to .lance-context/secrets.json
+ */
+export async function saveSecrets(
+  projectPath: string,
+  secrets: LanceContextSecrets
+): Promise<void> {
+  const lanceDir = path.join(projectPath, '.lance-context');
+  const secretsPath = path.join(lanceDir, 'secrets.json');
+
+  // Ensure .lance-context directory exists
+  await fs.mkdir(lanceDir, { recursive: true });
+
+  // Load existing secrets and merge
+  const existing = await loadSecrets(projectPath);
+  const merged = { ...existing, ...secrets };
+
+  await fs.writeFile(secretsPath, JSON.stringify(merged, null, 2));
+}
+
+/**
+ * Embedding settings for dashboard configuration
+ */
+export interface EmbeddingSettings {
+  backend: 'jina' | 'ollama';
+  apiKey?: string;
+  ollamaUrl?: string;
+}
+
+/**
+ * Save embedding settings from dashboard
+ * - Stores backend preference in .lance-context.json
+ * - Stores API key in .lance-context/secrets.json (gitignored)
+ */
+export async function saveEmbeddingSettings(
+  projectPath: string,
+  settings: EmbeddingSettings
+): Promise<void> {
+  // Load existing config
+  const configPath = path.join(projectPath, '.lance-context.json');
+  let existingConfig: LanceContextConfig = {};
+
+  try {
+    const content = await fs.readFile(configPath, 'utf-8');
+    existingConfig = JSON.parse(content);
+  } catch {
+    // File doesn't exist, start fresh
+  }
+
+  // Update embedding config
+  existingConfig.embedding = {
+    ...existingConfig.embedding,
+    backend: settings.backend,
+  };
+
+  // Save config
+  await fs.writeFile(configPath, JSON.stringify(existingConfig, null, 2));
+
+  // Save API key to secrets if provided
+  if (settings.apiKey) {
+    await saveSecrets(projectPath, { jinaApiKey: settings.apiKey });
+  }
+}
+
+/**
+ * Get current embedding settings including secrets
+ */
+export async function getEmbeddingSettings(projectPath: string): Promise<{
+  backend: 'jina' | 'ollama' | 'auto';
+  hasApiKey: boolean;
+  ollamaUrl?: string;
+}> {
+  const config = await loadConfig(projectPath);
+  const secrets = await loadSecrets(projectPath);
+
+  return {
+    backend: config.embedding?.backend || 'auto',
+    hasApiKey: !!(secrets.jinaApiKey || process.env.JINA_API_KEY),
+    ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
+  };
+}
