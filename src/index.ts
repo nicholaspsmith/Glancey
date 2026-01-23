@@ -22,6 +22,24 @@ import {
 } from './dashboard/index.js';
 import type { CommandName } from './dashboard/index.js';
 
+// Symbolic analysis imports
+import {
+  SymbolExtractor,
+  searchForPattern,
+  formatPatternSearchResults,
+  ReferenceFinder,
+  formatReferencesResult,
+  SymbolEditor,
+  SymbolRenamer,
+  formatRenameResult,
+  SymbolKind,
+  SymbolKindNames,
+  parseNamePath,
+  matchNamePath,
+  formatNamePath,
+} from './symbols/index.js';
+import { MemoryManager, formatMemoryList } from './memory/index.js';
+
 /**
  * Check if browser was recently opened (within the last hour)
  */
@@ -99,11 +117,11 @@ const TOOL_GUIDANCE = `
  * Server instructions provided at MCP initialization.
  * These guide Claude on when to use lance-context tools vs alternatives.
  */
-const SERVER_INSTRUCTIONS = `# lance-context - Semantic Code Search
+const SERVER_INSTRUCTIONS = `# lance-context - Semantic Code Search & Symbol Analysis
 
 ## When to Use lance-context Tools
 
-**PREFER lance-context tools** over pattern-based alternatives (grep, find, Serena) for code exploration:
+**PREFER lance-context tools** over pattern-based alternatives (grep, find) for code exploration:
 
 | Task | Use lance-context | Instead of |
 |------|-------------------|------------|
@@ -112,14 +130,40 @@ const SERVER_INSTRUCTIONS = `# lance-context - Semantic Code Search
 | Explore unfamiliar code | \`search_code\` | multiple grep/find attempts |
 | Find similar patterns | \`search_similar\` | manual comparison |
 | Commit changes | \`commit\` | git commit |
+| Understand file structure | \`get_symbols_overview\` | reading entire file |
+| Find specific function/class | \`find_symbol\` | grep for definition |
+| Find symbol usages | \`find_referencing_symbols\` | grep for name |
+| Search with regex | \`search_for_pattern\` | grep/rg |
 
-## Tool Overview
+## Tool Categories
 
+### Semantic Search
 - **search_code**: Natural language code search. One call replaces multiple pattern searches.
 - **search_similar**: Find duplicate/related code patterns.
-- **commit**: Git commit with validation (feature branch check, message format, single responsibility).
-- **index_codebase**: Build/update the search index.
-- **get_index_status**: Check if index is ready.
+
+### Symbol Navigation
+- **get_symbols_overview**: List all symbols in a file grouped by kind (Class, Function, etc.)
+- **find_symbol**: Search by name path pattern (e.g., "MyClass/myMethod", "get*")
+- **find_referencing_symbols**: Find all usages of a symbol across codebase
+- **search_for_pattern**: Regex search with context lines
+
+### Symbol Editing
+- **replace_symbol_body**: Replace entire symbol definition
+- **insert_before_symbol**: Add code before a symbol
+- **insert_after_symbol**: Add code after a symbol
+- **rename_symbol**: Rename symbol across entire codebase
+
+### Memory (Project Context)
+- **write_memory**: Save project-specific notes/decisions
+- **read_memory**: Retrieve saved context
+- **list_memories**: See available memories
+- **edit_memory**: Find/replace in memory
+- **delete_memory**: Remove a memory
+
+### Git & Index
+- **commit**: Git commit with validation (feature branch, message format)
+- **index_codebase**: Build/update the search index
+- **get_index_status**: Check if index is ready
 
 ## Signs You Should Have Used search_code
 
@@ -350,6 +394,362 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
           },
           required: ['message'],
+        },
+      },
+      // --- Symbolic Analysis Tools ---
+      {
+        name: 'get_symbols_overview',
+        description:
+          "Get a high-level overview of code symbols in a file. Returns symbols grouped by kind (Class, Function, Method, etc.) in a compact format. Use this to understand a file's structure before diving into specific symbols.",
+        inputSchema: {
+          type: 'object',
+          properties: {
+            relative_path: {
+              type: 'string',
+              description: 'The relative path to the file to analyze.',
+            },
+            depth: {
+              type: 'number',
+              description: 'Depth of descendants to retrieve (0 = top-level only). Default: 0.',
+            },
+            max_answer_chars: {
+              type: 'number',
+              description: 'Maximum response size in characters. Default: 50000.',
+            },
+          },
+          required: ['relative_path'],
+        },
+      },
+      {
+        name: 'find_symbol',
+        description:
+          'Find symbols by name path pattern. Supports: (1) simple name "myFunction", (2) relative path "MyClass/myMethod", (3) absolute path "/MyClass/myMethod", (4) glob pattern "get*" with substring_matching. Returns symbol locations and optionally their source code body.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name_path_pattern: {
+              type: 'string',
+              description:
+                'The name path pattern to search for (e.g., "MyClass/myMethod", "get*").',
+            },
+            relative_path: {
+              type: 'string',
+              description: 'Optional. Restrict search to this file or directory.',
+            },
+            depth: {
+              type: 'number',
+              description:
+                'Depth of descendants to retrieve (e.g., 1 for class methods). Default: 0.',
+            },
+            include_body: {
+              type: 'boolean',
+              description: "Whether to include the symbol's source code. Default: false.",
+            },
+            include_info: {
+              type: 'boolean',
+              description:
+                'Whether to include additional info (docstring, signature). Default: false.',
+            },
+            substring_matching: {
+              type: 'boolean',
+              description:
+                'If true, use substring matching for the last element of the pattern. Default: false.',
+            },
+            include_kinds: {
+              type: 'array',
+              items: { type: 'number' },
+              description:
+                'LSP symbol kind integers to include. If not provided, all kinds are included.',
+            },
+            exclude_kinds: {
+              type: 'array',
+              items: { type: 'number' },
+              description:
+                'LSP symbol kind integers to exclude. Takes precedence over include_kinds.',
+            },
+            max_answer_chars: {
+              type: 'number',
+              description: 'Maximum response size in characters. Default: 50000.',
+            },
+          },
+          required: ['name_path_pattern'],
+        },
+      },
+      {
+        name: 'find_referencing_symbols',
+        description:
+          'Find all references to a symbol across the codebase. Returns code snippets showing where the symbol is used.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name_path: {
+              type: 'string',
+              description:
+                'Name path of the symbol to find references for (e.g., "MyClass/myMethod").',
+            },
+            relative_path: {
+              type: 'string',
+              description: 'The relative path to the file containing the symbol.',
+            },
+            include_info: {
+              type: 'boolean',
+              description:
+                'Whether to include additional info about referencing symbols. Default: false.',
+            },
+            include_kinds: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'LSP symbol kind integers to include.',
+            },
+            exclude_kinds: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'LSP symbol kind integers to exclude.',
+            },
+            max_answer_chars: {
+              type: 'number',
+              description: 'Maximum response size in characters. Default: 50000.',
+            },
+          },
+          required: ['name_path', 'relative_path'],
+        },
+      },
+      {
+        name: 'search_for_pattern',
+        description:
+          'Search for a regex pattern in the codebase. Returns matched lines with optional context. Useful for finding code patterns, TODO comments, specific strings, etc.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            substring_pattern: {
+              type: 'string',
+              description: 'Regular expression pattern to search for.',
+            },
+            relative_path: {
+              type: 'string',
+              description: 'Restrict search to this file or directory. Default: entire project.',
+            },
+            restrict_search_to_code_files: {
+              type: 'boolean',
+              description: 'Only search in code files (not config, docs). Default: false.',
+            },
+            paths_include_glob: {
+              type: 'string',
+              description: 'Glob pattern for files to include (e.g., "*.py", "src/**/*.ts").',
+            },
+            paths_exclude_glob: {
+              type: 'string',
+              description:
+                'Glob pattern for files to exclude (e.g., "*test*", "**/*_generated.py").',
+            },
+            context_lines_before: {
+              type: 'number',
+              description: 'Number of context lines before each match. Default: 0.',
+            },
+            context_lines_after: {
+              type: 'number',
+              description: 'Number of context lines after each match. Default: 0.',
+            },
+            max_answer_chars: {
+              type: 'number',
+              description: 'Maximum response size in characters. Default: 50000.',
+            },
+          },
+          required: ['substring_pattern'],
+        },
+      },
+      // --- Memory Tools ---
+      {
+        name: 'write_memory',
+        description:
+          'Write information about this project to a named memory file. Memories persist across sessions and can be read later. Useful for storing architectural decisions, patterns, or project-specific context.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            memory_file_name: {
+              type: 'string',
+              description: 'The name of the memory (will be saved as .md file).',
+            },
+            content: {
+              type: 'string',
+              description: 'The markdown content to write to the memory.',
+            },
+            max_answer_chars: {
+              type: 'number',
+              description: 'Maximum response size in characters. Default: 50000.',
+            },
+          },
+          required: ['memory_file_name', 'content'],
+        },
+      },
+      {
+        name: 'read_memory',
+        description:
+          'Read the content of a memory file. Only read memories that are relevant to the current task.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            memory_file_name: {
+              type: 'string',
+              description: 'The name of the memory to read.',
+            },
+            max_answer_chars: {
+              type: 'number',
+              description: 'Maximum response size in characters. Default: 50000.',
+            },
+          },
+          required: ['memory_file_name'],
+        },
+      },
+      {
+        name: 'list_memories',
+        description:
+          'List all available memory files for this project. Use this to discover what project context has been saved.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
+        name: 'delete_memory',
+        description:
+          'Delete a memory file. Only delete memories when explicitly requested by the user.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            memory_file_name: {
+              type: 'string',
+              description: 'The name of the memory to delete.',
+            },
+          },
+          required: ['memory_file_name'],
+        },
+      },
+      {
+        name: 'edit_memory',
+        description:
+          'Edit a memory file using find/replace. Supports both literal string and regex replacement.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            memory_file_name: {
+              type: 'string',
+              description: 'The name of the memory to edit.',
+            },
+            needle: {
+              type: 'string',
+              description: 'The string or regex pattern to search for.',
+            },
+            repl: {
+              type: 'string',
+              description: 'The replacement string.',
+            },
+            mode: {
+              type: 'string',
+              enum: ['literal', 'regex'],
+              description:
+                'How to interpret the needle: "literal" for exact match, "regex" for regex pattern.',
+            },
+          },
+          required: ['memory_file_name', 'needle', 'repl', 'mode'],
+        },
+      },
+      // --- Symbol Editing Tools ---
+      {
+        name: 'replace_symbol_body',
+        description:
+          'Replace the entire body of a symbol (function, class, method, etc.) with new content. Use this for significant rewrites of symbol definitions.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name_path: {
+              type: 'string',
+              description: 'Name path of the symbol to replace (e.g., "MyClass/myMethod").',
+            },
+            relative_path: {
+              type: 'string',
+              description: 'The relative path to the file containing the symbol.',
+            },
+            body: {
+              type: 'string',
+              description:
+                'The new body content for the symbol (including signature line for functions).',
+            },
+          },
+          required: ['name_path', 'relative_path', 'body'],
+        },
+      },
+      {
+        name: 'insert_before_symbol',
+        description:
+          'Insert code before a symbol definition. Useful for adding new functions, classes, or imports before an existing symbol.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name_path: {
+              type: 'string',
+              description: 'Name path of the symbol to insert before.',
+            },
+            relative_path: {
+              type: 'string',
+              description: 'The relative path to the file containing the symbol.',
+            },
+            body: {
+              type: 'string',
+              description: 'The content to insert before the symbol.',
+            },
+          },
+          required: ['name_path', 'relative_path', 'body'],
+        },
+      },
+      {
+        name: 'insert_after_symbol',
+        description:
+          'Insert code after a symbol definition. Useful for adding new functions, classes, or code after an existing symbol.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name_path: {
+              type: 'string',
+              description: 'Name path of the symbol to insert after.',
+            },
+            relative_path: {
+              type: 'string',
+              description: 'The relative path to the file containing the symbol.',
+            },
+            body: {
+              type: 'string',
+              description: 'The content to insert after the symbol.',
+            },
+          },
+          required: ['name_path', 'relative_path', 'body'],
+        },
+      },
+      {
+        name: 'rename_symbol',
+        description:
+          'Rename a symbol throughout the entire codebase. Updates the symbol definition and all references.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name_path: {
+              type: 'string',
+              description: 'Name path of the symbol to rename.',
+            },
+            relative_path: {
+              type: 'string',
+              description: 'The relative path to the file containing the symbol definition.',
+            },
+            new_name: {
+              type: 'string',
+              description: 'The new name for the symbol.',
+            },
+            dry_run: {
+              type: 'boolean',
+              description: 'If true, preview changes without making them. Default: false.',
+            },
+          },
+          required: ['name_path', 'relative_path', 'new_name'],
         },
       },
     ],
@@ -658,6 +1058,561 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         } catch (e) {
           throw wrapError('Git commit failed', 'git', e, { message });
         }
+      }
+
+      // --- Symbolic Analysis Tools ---
+      case 'get_symbols_overview': {
+        const relativePath = isString(args?.relative_path) ? args.relative_path : '';
+        if (!relativePath) {
+          throw new LanceContextError('relative_path is required', 'validation', {
+            tool: 'get_symbols_overview',
+          });
+        }
+        const depth = isNumber(args?.depth) ? args.depth : 0;
+
+        const extractor = new SymbolExtractor(PROJECT_PATH);
+        const overview = await extractor.getSymbolsOverview(relativePath, depth);
+
+        // Format the output
+        const parts: string[] = [];
+        parts.push(`## Symbols in ${overview.filepath}\n`);
+        parts.push(`Total: ${overview.totalSymbols} symbols\n`);
+
+        for (const [kindName, entries] of Object.entries(overview.byKind)) {
+          parts.push(`\n### ${kindName} (${entries.length})\n`);
+          for (const entry of entries) {
+            const childInfo = entry.children ? ` [${entry.children} children]` : '';
+            parts.push(`- **${entry.name}** (${entry.lines})${childInfo}`);
+          }
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: parts.join('\n') + TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      case 'find_symbol': {
+        const namePathPattern = isString(args?.name_path_pattern) ? args.name_path_pattern : '';
+        if (!namePathPattern) {
+          throw new LanceContextError('name_path_pattern is required', 'validation', {
+            tool: 'find_symbol',
+          });
+        }
+        const relativePath = isString(args?.relative_path) ? args.relative_path : undefined;
+        const depth = isNumber(args?.depth) ? args.depth : 0;
+        const includeBody = isBoolean(args?.include_body) ? args.include_body : false;
+        const substringMatching = isBoolean(args?.substring_matching)
+          ? args.substring_matching
+          : false;
+        const includeKinds = Array.isArray(args?.include_kinds)
+          ? (args.include_kinds as SymbolKind[])
+          : undefined;
+        const excludeKinds = Array.isArray(args?.exclude_kinds)
+          ? (args.exclude_kinds as SymbolKind[])
+          : undefined;
+
+        const extractor = new SymbolExtractor(PROJECT_PATH);
+
+        // If relativePath is provided, search in that file/directory
+        // Otherwise, we need to search the whole codebase (more expensive)
+        const files: string[] = [];
+        if (relativePath) {
+          const fullPath = path.join(PROJECT_PATH, relativePath);
+          try {
+            const fsStat = fs.statSync(fullPath);
+            if (fsStat.isFile()) {
+              files.push(relativePath);
+            } else {
+              // Directory - find all analyzable files
+              const { glob: globFn } = await import('glob');
+              const codeExtensions = [
+                '*.ts',
+                '*.tsx',
+                '*.js',
+                '*.jsx',
+                '*.py',
+                '*.go',
+                '*.rs',
+                '*.java',
+                '*.rb',
+              ];
+              for (const ext of codeExtensions) {
+                const matches = await globFn(`**/${ext}`, {
+                  cwd: fullPath,
+                  ignore: ['node_modules/**', 'dist/**', '.git/**'],
+                });
+                files.push(...matches.map((f: string) => path.join(relativePath, f)));
+              }
+            }
+          } catch {
+            throw new LanceContextError(`Path not found: ${relativePath}`, 'validation', {
+              tool: 'find_symbol',
+            });
+          }
+        } else {
+          // Search whole codebase - expensive, limit to reasonable set
+          const { glob: globFn } = await import('glob');
+          const codeExtensions = [
+            '*.ts',
+            '*.tsx',
+            '*.js',
+            '*.jsx',
+            '*.py',
+            '*.go',
+            '*.rs',
+            '*.java',
+            '*.rb',
+          ];
+          for (const ext of codeExtensions) {
+            const matches = await globFn(`**/${ext}`, {
+              cwd: PROJECT_PATH,
+              ignore: ['node_modules/**', 'dist/**', '.git/**'],
+            });
+            files.push(...matches);
+          }
+        }
+
+        // Parse the pattern
+        const pattern = parseNamePath(namePathPattern);
+
+        // Find matching symbols
+        const matchedSymbols: Array<{ symbol: import('./symbols/types.js').Symbol; file: string }> =
+          [];
+
+        for (const file of files.slice(0, 100)) {
+          // Limit to prevent timeout
+          try {
+            const symbols = await extractor.extractSymbols(file, includeBody);
+            const findMatches = (
+              syms: import('./symbols/types.js').Symbol[],
+              currentDepth: number
+            ) => {
+              for (const sym of syms) {
+                // Apply kind filters
+                if (excludeKinds && excludeKinds.includes(sym.kind)) continue;
+                if (includeKinds && !includeKinds.includes(sym.kind)) continue;
+
+                if (matchNamePath(sym.namePath, pattern, substringMatching)) {
+                  matchedSymbols.push({ symbol: sym, file });
+                }
+
+                // Search children up to requested depth
+                if (currentDepth < depth && sym.children) {
+                  findMatches(sym.children, currentDepth + 1);
+                }
+              }
+            };
+            findMatches(symbols, 0);
+          } catch {
+            // Skip files that can't be analyzed
+          }
+        }
+
+        if (matchedSymbols.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `No symbols found matching pattern: ${namePathPattern}` + TOOL_GUIDANCE,
+              },
+            ],
+          };
+        }
+
+        // Format results
+        const parts: string[] = [];
+        parts.push(`Found ${matchedSymbols.length} matching symbol(s):\n`);
+
+        for (const { symbol } of matchedSymbols) {
+          const kindName = SymbolKindNames[symbol.kind];
+          parts.push(`\n## ${formatNamePath(symbol.namePath)} (${kindName})`);
+          parts.push(
+            `**Location:** ${symbol.location.filepath}:${symbol.location.startLine}-${symbol.location.endLine}`
+          );
+
+          if (symbol.body) {
+            parts.push('\n```');
+            parts.push(symbol.body);
+            parts.push('```');
+          }
+
+          if (symbol.children && symbol.children.length > 0) {
+            parts.push(`\n**Children:** ${symbol.children.length}`);
+            for (const child of symbol.children) {
+              const childKind = SymbolKindNames[child.kind];
+              parts.push(
+                `  - ${child.name} (${childKind}, lines ${child.location.startLine}-${child.location.endLine})`
+              );
+            }
+          }
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: parts.join('\n') + TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      case 'find_referencing_symbols': {
+        const namePath = isString(args?.name_path) ? args.name_path : '';
+        const relativePath = isString(args?.relative_path) ? args.relative_path : '';
+
+        if (!namePath || !relativePath) {
+          throw new LanceContextError('name_path and relative_path are required', 'validation', {
+            tool: 'find_referencing_symbols',
+          });
+        }
+
+        const includeInfo = isBoolean(args?.include_info) ? args.include_info : false;
+        const includeKinds = Array.isArray(args?.include_kinds)
+          ? (args.include_kinds as SymbolKind[])
+          : undefined;
+        const excludeKinds = Array.isArray(args?.exclude_kinds)
+          ? (args.exclude_kinds as SymbolKind[])
+          : undefined;
+
+        const finder = new ReferenceFinder(PROJECT_PATH);
+        const references = await finder.findReferences({
+          namePath,
+          relativePath,
+          includeInfo,
+          includeKinds,
+          excludeKinds,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: formatReferencesResult(references) + TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      case 'search_for_pattern': {
+        const substringPattern = isString(args?.substring_pattern) ? args.substring_pattern : '';
+        if (!substringPattern) {
+          throw new LanceContextError('substring_pattern is required', 'validation', {
+            tool: 'search_for_pattern',
+          });
+        }
+
+        const result = await searchForPattern(PROJECT_PATH, {
+          substringPattern,
+          relativePath: isString(args?.relative_path) ? args.relative_path : undefined,
+          restrictSearchToCodeFiles: isBoolean(args?.restrict_search_to_code_files)
+            ? args.restrict_search_to_code_files
+            : false,
+          pathsIncludeGlob: isString(args?.paths_include_glob)
+            ? args.paths_include_glob
+            : undefined,
+          pathsExcludeGlob: isString(args?.paths_exclude_glob)
+            ? args.paths_exclude_glob
+            : undefined,
+          contextLinesBefore: isNumber(args?.context_lines_before) ? args.context_lines_before : 0,
+          contextLinesAfter: isNumber(args?.context_lines_after) ? args.context_lines_after : 0,
+          maxAnswerChars: isNumber(args?.max_answer_chars) ? args.max_answer_chars : 50000,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: formatPatternSearchResults(result) + TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      // --- Memory Tools ---
+      case 'write_memory': {
+        const memoryFileName = isString(args?.memory_file_name) ? args.memory_file_name : '';
+        const content = isString(args?.content) ? args.content : '';
+
+        if (!memoryFileName || !content) {
+          throw new LanceContextError('memory_file_name and content are required', 'validation', {
+            tool: 'write_memory',
+          });
+        }
+
+        const memoryManager = new MemoryManager(PROJECT_PATH);
+        await memoryManager.writeMemory(memoryFileName, content);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Memory "${memoryFileName}" saved successfully.` + TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      case 'read_memory': {
+        const memoryFileName = isString(args?.memory_file_name) ? args.memory_file_name : '';
+
+        if (!memoryFileName) {
+          throw new LanceContextError('memory_file_name is required', 'validation', {
+            tool: 'read_memory',
+          });
+        }
+
+        const memoryManager = new MemoryManager(PROJECT_PATH);
+        const content = await memoryManager.readMemory(memoryFileName);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `## Memory: ${memoryFileName}\n\n${content}` + TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      case 'list_memories': {
+        const memoryManager = new MemoryManager(PROJECT_PATH);
+        const memories = await memoryManager.listMemories();
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: formatMemoryList(memories) + TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      case 'delete_memory': {
+        const memoryFileName = isString(args?.memory_file_name) ? args.memory_file_name : '';
+
+        if (!memoryFileName) {
+          throw new LanceContextError('memory_file_name is required', 'validation', {
+            tool: 'delete_memory',
+          });
+        }
+
+        const memoryManager = new MemoryManager(PROJECT_PATH);
+        await memoryManager.deleteMemory(memoryFileName);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Memory "${memoryFileName}" deleted successfully.` + TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      case 'edit_memory': {
+        const memoryFileName = isString(args?.memory_file_name) ? args.memory_file_name : '';
+        const needle = isString(args?.needle) ? args.needle : '';
+        const repl = isString(args?.repl) ? args.repl : '';
+        const mode = isString(args?.mode) ? args.mode : '';
+
+        if (!memoryFileName || !needle || mode === '') {
+          throw new LanceContextError(
+            'memory_file_name, needle, repl, and mode are required',
+            'validation',
+            { tool: 'edit_memory' }
+          );
+        }
+
+        if (mode !== 'literal' && mode !== 'regex') {
+          throw new LanceContextError('mode must be "literal" or "regex"', 'validation', {
+            tool: 'edit_memory',
+          });
+        }
+
+        const memoryManager = new MemoryManager(PROJECT_PATH);
+        const result = await memoryManager.editMemory(memoryFileName, needle, repl, mode);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `Memory "${memoryFileName}" edited. ${result.matchCount} replacement(s) made.` +
+                TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      // --- Symbol Editing Tools ---
+      case 'replace_symbol_body': {
+        const namePath = isString(args?.name_path) ? args.name_path : '';
+        const relativePath = isString(args?.relative_path) ? args.relative_path : '';
+        const body = isString(args?.body) ? args.body : '';
+
+        if (!namePath || !relativePath || !body) {
+          throw new LanceContextError(
+            'name_path, relative_path, and body are required',
+            'validation',
+            { tool: 'replace_symbol_body' }
+          );
+        }
+
+        const editor = new SymbolEditor(PROJECT_PATH);
+        const result = await editor.replaceSymbolBody({ namePath, relativePath, body });
+
+        if (!result.success) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Failed to replace symbol: ${result.error}` + TOOL_GUIDANCE,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `Symbol "${result.symbolName}" replaced in ${result.filepath}.\n` +
+                `New location: lines ${result.newRange?.startLine}-${result.newRange?.endLine}` +
+                TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      case 'insert_before_symbol': {
+        const namePath = isString(args?.name_path) ? args.name_path : '';
+        const relativePath = isString(args?.relative_path) ? args.relative_path : '';
+        const body = isString(args?.body) ? args.body : '';
+
+        if (!namePath || !relativePath || !body) {
+          throw new LanceContextError(
+            'name_path, relative_path, and body are required',
+            'validation',
+            { tool: 'insert_before_symbol' }
+          );
+        }
+
+        const editor = new SymbolEditor(PROJECT_PATH);
+        const result = await editor.insertBeforeSymbol({ namePath, relativePath, body });
+
+        if (!result.success) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Failed to insert before symbol: ${result.error}` + TOOL_GUIDANCE,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `Content inserted before "${result.symbolName}" in ${result.filepath}.\n` +
+                `Inserted at: lines ${result.newRange?.startLine}-${result.newRange?.endLine}` +
+                TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      case 'insert_after_symbol': {
+        const namePath = isString(args?.name_path) ? args.name_path : '';
+        const relativePath = isString(args?.relative_path) ? args.relative_path : '';
+        const body = isString(args?.body) ? args.body : '';
+
+        if (!namePath || !relativePath || !body) {
+          throw new LanceContextError(
+            'name_path, relative_path, and body are required',
+            'validation',
+            { tool: 'insert_after_symbol' }
+          );
+        }
+
+        const editor = new SymbolEditor(PROJECT_PATH);
+        const result = await editor.insertAfterSymbol({ namePath, relativePath, body });
+
+        if (!result.success) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Failed to insert after symbol: ${result.error}` + TOOL_GUIDANCE,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `Content inserted after "${result.symbolName}" in ${result.filepath}.\n` +
+                `Inserted at: lines ${result.newRange?.startLine}-${result.newRange?.endLine}` +
+                TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      case 'rename_symbol': {
+        const namePath = isString(args?.name_path) ? args.name_path : '';
+        const relativePath = isString(args?.relative_path) ? args.relative_path : '';
+        const newName = isString(args?.new_name) ? args.new_name : '';
+        const dryRun = isBoolean(args?.dry_run) ? args.dry_run : false;
+
+        if (!namePath || !relativePath || !newName) {
+          throw new LanceContextError(
+            'name_path, relative_path, and new_name are required',
+            'validation',
+            { tool: 'rename_symbol' }
+          );
+        }
+
+        const renamer = new SymbolRenamer(PROJECT_PATH);
+        const result = await renamer.renameSymbol({ namePath, relativePath, newName, dryRun });
+
+        if (!result.success) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Failed to rename symbol: ${result.error}` + TOOL_GUIDANCE,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const modeLabel = dryRun ? ' (dry run)' : '';
+        return {
+          content: [
+            {
+              type: 'text',
+              text: formatRenameResult(result) + modeLabel + TOOL_GUIDANCE,
+            },
+          ],
+        };
       }
 
       default:
