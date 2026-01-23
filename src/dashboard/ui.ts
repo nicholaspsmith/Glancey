@@ -274,6 +274,103 @@ export function getDashboardHTML(): string {
       color: var(--accent-red);
     }
 
+    /* Form styles */
+    .settings-form {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .form-select,
+    .form-input {
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      background-color: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-primary);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .form-select:focus,
+    .form-input:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+    }
+
+    .form-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .form-hint a {
+      color: var(--accent-blue);
+      text-decoration: none;
+    }
+
+    .form-hint a:hover {
+      text-decoration: underline;
+    }
+
+    .form-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background-color: var(--accent-blue);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .save-status {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .save-status.success {
+      color: var(--accent-green);
+    }
+
+    .save-status.error {
+      color: var(--accent-red);
+    }
+
     .stat {
       margin-bottom: 12px;
     }
@@ -650,14 +747,34 @@ export function getDashboardHTML(): string {
       <div class="card">
         <div class="card-header">
           <span class="card-title">Embedding Backend</span>
+          <span class="badge" id="embeddingStatus">-</span>
         </div>
         <div class="stat">
-          <div class="stat-label">Backend</div>
+          <div class="stat-label">Current Backend</div>
           <div class="stat-value small" id="embeddingBackend">-</div>
         </div>
         <div class="stat">
           <div class="stat-label">Index Path</div>
           <div class="stat-value small" id="indexPath">-</div>
+        </div>
+        <div class="settings-form" id="embeddingSettingsForm">
+          <div class="form-group">
+            <label for="backendSelect">Select Backend</label>
+            <select id="backendSelect" class="form-select">
+              <option value="auto">Auto (detect available)</option>
+              <option value="jina">Jina AI (cloud)</option>
+              <option value="ollama">Ollama (local)</option>
+            </select>
+          </div>
+          <div class="form-group" id="apiKeyGroup" style="display: none;">
+            <label for="apiKeyInput">Jina API Key</label>
+            <input type="password" id="apiKeyInput" class="form-input" placeholder="jina_..." />
+            <div class="form-hint">Get your free API key at <a href="https://jina.ai/" target="_blank">jina.ai</a></div>
+          </div>
+          <div class="form-actions">
+            <button type="button" id="saveEmbeddingBtn" class="btn btn-primary">Save Settings</button>
+            <span id="saveStatus" class="save-status"></span>
+          </div>
         </div>
       </div>
 
@@ -817,6 +934,7 @@ export function getDashboardHTML(): string {
     const chunkCount = document.getElementById('chunkCount');
     const lastUpdated = document.getElementById('lastUpdated');
     const embeddingBackend = document.getElementById('embeddingBackend');
+    const embeddingStatus = document.getElementById('embeddingStatus');
     const indexPath = document.getElementById('indexPath');
     const projectPath = document.getElementById('projectPath');
     const chunkSize = document.getElementById('chunkSize');
@@ -826,6 +944,91 @@ export function getDashboardHTML(): string {
     const progressContainer = document.getElementById('progressContainer');
     const progressFill = document.getElementById('progressFill');
     const progressText = document.getElementById('progressText');
+
+    // Embedding settings form elements
+    const backendSelect = document.getElementById('backendSelect');
+    const apiKeyGroup = document.getElementById('apiKeyGroup');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const saveEmbeddingBtn = document.getElementById('saveEmbeddingBtn');
+    const saveStatus = document.getElementById('saveStatus');
+
+    // Toggle API key input visibility based on backend selection
+    backendSelect.addEventListener('change', function() {
+      apiKeyGroup.style.display = this.value === 'jina' ? 'block' : 'none';
+    });
+
+    // Load current embedding settings
+    async function loadEmbeddingSettings() {
+      try {
+        const response = await fetch('/api/settings/embedding');
+        if (response.ok) {
+          const settings = await response.json();
+          backendSelect.value = settings.backend || 'auto';
+          apiKeyGroup.style.display = settings.backend === 'jina' ? 'block' : 'none';
+
+          // Update status badge
+          if (settings.hasApiKey) {
+            embeddingStatus.textContent = 'API Key Set';
+            embeddingStatus.className = 'badge success';
+          } else if (settings.backend === 'ollama') {
+            embeddingStatus.textContent = 'Local';
+            embeddingStatus.className = 'badge';
+          } else {
+            embeddingStatus.textContent = 'Not Configured';
+            embeddingStatus.className = 'badge warning';
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load embedding settings:', error);
+      }
+    }
+
+    // Save embedding settings
+    saveEmbeddingBtn.addEventListener('click', async function() {
+      const backend = backendSelect.value;
+      const apiKey = apiKeyInput.value.trim();
+
+      if (backend === 'jina' && !apiKey) {
+        saveStatus.textContent = 'API key required for Jina';
+        saveStatus.className = 'save-status error';
+        return;
+      }
+
+      saveEmbeddingBtn.disabled = true;
+      saveStatus.textContent = 'Saving...';
+      saveStatus.className = 'save-status';
+
+      try {
+        const response = await fetch('/api/settings/embedding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            backend: backend === 'auto' ? 'ollama' : backend,
+            apiKey: backend === 'jina' ? apiKey : undefined
+          })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          saveStatus.textContent = 'Saved! Restart server to apply.';
+          saveStatus.className = 'save-status success';
+          apiKeyInput.value = ''; // Clear the input
+          loadEmbeddingSettings(); // Reload to update status
+        } else {
+          saveStatus.textContent = result.error || 'Failed to save';
+          saveStatus.className = 'save-status error';
+        }
+      } catch (error) {
+        saveStatus.textContent = 'Network error';
+        saveStatus.className = 'save-status error';
+      } finally {
+        saveEmbeddingBtn.disabled = false;
+      }
+    });
+
+    // Load embedding settings on page load
+    loadEmbeddingSettings();
 
     // Format date
     function formatDate(isoString) {
