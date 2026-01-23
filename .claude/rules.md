@@ -23,6 +23,55 @@ Use **lance-context** for semantic code search when exploring the codebase:
 
 Before committing changes, always review this rules file (`.claude/rules.md`) to ensure compliance with project standards.
 
+## Branching Strategy
+
+**NEVER commit directly to `main`.** All code changes must go through feature branches.
+
+### Workflow
+
+1. **Create a feature branch** before making any code changes:
+   ```bash
+   git checkout -b feature/descriptive-name
+   ```
+
+2. **Make focused, atomic commits** on the feature branch (see Git Commit Rules below)
+
+3. **Push the feature branch** to remote:
+   ```bash
+   git push -u origin feature/descriptive-name
+   ```
+
+4. **Create a pull request** using GitHub CLI:
+   ```bash
+   gh pr create --title "Brief description" --body "## Summary\n- Change 1\n- Change 2"
+   ```
+
+5. **Wait for CI checks to pass** before merging:
+   ```bash
+   gh pr checks
+   ```
+
+6. **Merge to main** only after all checks pass:
+   ```bash
+   gh pr merge --squash
+   ```
+
+### Branch Naming
+
+Use descriptive branch names with prefixes:
+- `feature/` - New features (e.g., `feature/add-dashboard`)
+- `fix/` - Bug fixes (e.g., `fix/search-timeout`)
+- `refactor/` - Code refactoring (e.g., `refactor/embedding-backend`)
+- `docs/` - Documentation changes (e.g., `docs/update-readme`)
+- `test/` - Test additions/changes (e.g., `test/add-indexer-tests`)
+
+### Before Merging Checklist
+
+- [ ] All CI checks pass (`gh pr checks`)
+- [ ] Code has been reviewed (if applicable)
+- [ ] Branch is up to date with main (`git pull origin main --rebase`)
+- [ ] No merge conflicts
+
 ## Git Commit Rules
 
 1. **Maximum Subject Line Length**: 72 characters maximum for the commit subject line (first line)
@@ -76,6 +125,13 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 
 ## Remember
 
+### Branching
+- **NEVER commit directly to main** - always use feature branches
+- Create a feature branch before making any code changes
+- Ensure all CI checks pass before merging to main
+- Use `gh pr create` and `gh pr merge` for the PR workflow
+
+### Commits
 - Each commit must have exactly ONE responsibility
 - Keep commits focused and atomic
 - Write clear, imperative commit messages ("Add feature" not "Added feature")
