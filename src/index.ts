@@ -376,6 +376,59 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: 'summarize_codebase',
+        description:
+          'Generate a comprehensive summary of the codebase including file statistics, language distribution, and discovered concept areas. Uses k-means clustering on embeddings to identify related code groups.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            numClusters: {
+              type: 'number',
+              description:
+                'Target number of concept clusters (default: auto-determined based on codebase size)',
+            },
+          },
+        },
+      },
+      {
+        name: 'list_concepts',
+        description:
+          'List all discovered concept clusters in the codebase. Each cluster represents a semantic grouping of related code (e.g., authentication, database, API handlers). Returns cluster labels, sizes, and representative code chunks.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            forceRecluster: {
+              type: 'boolean',
+              description: 'Force reclustering even if cached results exist (default: false)',
+            },
+          },
+        },
+      },
+      {
+        name: 'search_by_concept',
+        description:
+          'Search for code within a specific concept cluster. Use list_concepts first to discover available clusters and their IDs. Can optionally combine with a semantic query to search within the cluster.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            conceptId: {
+              type: 'number',
+              description: 'The cluster ID to search within (from list_concepts)',
+            },
+            query: {
+              type: 'string',
+              description:
+                'Optional semantic query to search within the cluster. If not provided, returns representative chunks.',
+            },
+            limit: {
+              type: 'number',
+              description: 'Maximum number of results (default: 10)',
+            },
+          },
+          required: ['conceptId'],
+        },
+      },
+      {
         name: 'commit',
         description:
           'Create a git commit with validation. USE THIS TOOL instead of running git commit directly. This tool enforces project commit rules: (1) validates you are on a feature branch (not main), (2) checks commit message format (<=72 chars, imperative mood, single responsibility), (3) returns commit rules as a reminder. Prevents common mistakes like committing to main or multi-responsibility commits.',
@@ -910,6 +963,132 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const formatted = results
           .map((r, i) => {
             let header = `## Similar ${i + 1}: ${r.filepath}:${r.startLine}-${r.endLine} (${(r.similarity * 100).toFixed(1)}% similar)`;
+            if (r.symbolName) {
+              const typeLabel = r.symbolType ? ` (${r.symbolType})` : '';
+              header += `\n**Symbol:** \`${r.symbolName}\`${typeLabel}`;
+            }
+            return `${header}\n\`\`\`${r.language}\n${r.content}\n\`\`\``;
+          })
+          .join('\n\n');
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: formatted + TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      case 'summarize_codebase': {
+        const numClusters = isNumber(args?.numClusters) ? args.numClusters : undefined;
+        const summary = await idx.summarizeCodebase(numClusters ? { numClusters } : undefined);
+
+        const languageList = summary.languages
+          .map((l) => `- **${l.language}**: ${l.fileCount} files, ${l.chunkCount} chunks`)
+          .join('\n');
+
+        const conceptList = summary.concepts
+          .map((c) => {
+            const keywords = c.keywords.slice(0, 5).join(', ');
+            return `- **Cluster ${c.id}: ${c.label}** (${c.size} chunks)\n  Keywords: ${keywords}`;
+          })
+          .join('\n');
+
+        const formatted = `# Codebase Summary
+
+## Overview
+- **Total Files**: ${summary.totalFiles}
+- **Total Chunks**: ${summary.totalChunks}
+- **Concept Clusters**: ${summary.concepts.length}
+- **Clustering Quality**: ${(summary.clusteringQuality * 100).toFixed(1)}% (silhouette score)
+- **Generated At**: ${summary.generatedAt}
+
+## Languages
+${languageList}
+
+## Concept Areas
+${conceptList}`;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: formatted + TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      case 'list_concepts': {
+        const forceRecluster = isBoolean(args?.forceRecluster) ? args.forceRecluster : false;
+        const concepts = await idx.listConcepts(forceRecluster);
+
+        if (concepts.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  'No concept clusters found. Make sure the codebase is indexed first.' +
+                  TOOL_GUIDANCE,
+              },
+            ],
+          };
+        }
+
+        const formatted = concepts
+          .map((c) => {
+            const keywords = c.keywords.slice(0, 5).join(', ');
+            return `## Cluster ${c.id}: ${c.label}
+- **Size**: ${c.size} code chunks
+- **Keywords**: ${keywords}
+- **Representatives**: ${c.representativeChunks.slice(0, 3).join(', ')}`;
+          })
+          .join('\n\n');
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `# Concept Clusters\n\n${formatted}` + TOOL_GUIDANCE,
+            },
+          ],
+        };
+      }
+
+      case 'search_by_concept': {
+        const conceptId = isNumber(args?.conceptId) ? args.conceptId : -1;
+        if (conceptId < 0) {
+          throw new LanceContextError(
+            'conceptId is required and must be a non-negative number',
+            'validation',
+            { tool: 'search_by_concept' }
+          );
+        }
+
+        const query = isString(args?.query) ? args.query : undefined;
+        const limit = isNumber(args?.limit) ? args.limit : 10;
+
+        const results = await idx.searchByConcept(conceptId, query, limit);
+
+        if (results.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `No code found in concept cluster ${conceptId}. Try list_concepts to see available clusters.` +
+                  TOOL_GUIDANCE,
+              },
+            ],
+          };
+        }
+
+        const formatted = results
+          .map((r, i) => {
+            let header = `## Result ${i + 1}: ${r.filepath}:${r.startLine}-${r.endLine}`;
             if (r.symbolName) {
               const typeLabel = r.symbolType ? ` (${r.symbolType})` : '';
               header += `\n**Symbol:** \`${r.symbolName}\`${typeLabel}`;
