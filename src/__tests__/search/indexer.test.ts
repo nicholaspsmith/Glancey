@@ -100,7 +100,7 @@ describe('CodeIndexer', () => {
       const mockTable = createMockTable([
         {
           id: '1',
-          filePath: 'test.ts',
+          filepath: 'test.ts',
           content: 'code',
           startLine: 1,
           endLine: 10,
@@ -108,7 +108,7 @@ describe('CodeIndexer', () => {
         },
         {
           id: '2',
-          filePath: 'test.ts',
+          filepath: 'test.ts',
           content: 'more',
           startLine: 11,
           endLine: 20,
@@ -145,7 +145,7 @@ describe('CodeIndexer', () => {
       const mockTable = createMockTable([
         {
           id: '1',
-          filePath: 'test.ts',
+          filepath: 'test.ts',
           content: 'code',
           startLine: 1,
           endLine: 10,
@@ -183,7 +183,7 @@ describe('CodeIndexer', () => {
       const mockTable = createMockTable([
         {
           id: '1',
-          filePath: 'test.ts',
+          filepath: 'test.ts',
           content: 'function test',
           startLine: 1,
           endLine: 10,
@@ -207,7 +207,7 @@ describe('CodeIndexer', () => {
         .fill(null)
         .map((_, i) => ({
           id: `${i}`,
-          filePath: `test${i}.ts`,
+          filepath: `test${i}.ts`,
           content: `content ${i}`,
           startLine: 1,
           endLine: 10,
@@ -230,7 +230,7 @@ describe('CodeIndexer', () => {
       const mockTable = createMockTable([
         {
           id: 'test.ts:1-10',
-          filePath: 'test.ts',
+          filepath: 'test.ts',
           content: 'function hello() {}',
           startLine: 1,
           endLine: 10,
@@ -248,7 +248,7 @@ describe('CodeIndexer', () => {
 
       expect(results[0]).toEqual({
         id: 'test.ts:1-10',
-        filePath: 'test.ts',
+        filepath: 'test.ts',
         content: 'function hello() {}',
         startLine: 1,
         endLine: 10,
@@ -333,7 +333,7 @@ describe('CodeIndexer', () => {
       const mockTable = createMockTable([]);
       const mockMetadataTable = createMockTable([]);
       mockMetadataTable.query = vi.fn().mockReturnValue({
-        toArray: vi.fn().mockResolvedValue([{ filePath: 'test.ts', mtime: Date.now() }]),
+        toArray: vi.fn().mockResolvedValue([{ filepath: 'test.ts', mtime: Date.now() }]),
       });
 
       mockConnection.openTable.mockImplementation(async (name: string) => {
@@ -393,7 +393,7 @@ describe('CodeIndexer', () => {
       const mockTable = createMockTable([
         {
           id: '1',
-          filePath: 'auth.ts',
+          filepath: 'auth.ts',
           content: 'function authenticate() {}',
           startLine: 1,
           endLine: 1,
@@ -401,7 +401,7 @@ describe('CodeIndexer', () => {
         },
         {
           id: '2',
-          filePath: 'other.ts',
+          filepath: 'other.ts',
           content: 'function other() {}',
           startLine: 1,
           endLine: 1,
@@ -418,7 +418,7 @@ describe('CodeIndexer', () => {
       const results = await indexer.search('authenticate auth');
 
       // auth.ts should rank higher due to keyword match in both content and filepath
-      expect(results[0].filePath).toBe('auth.ts');
+      expect(results[0].filepath).toBe('auth.ts');
     });
   });
 });

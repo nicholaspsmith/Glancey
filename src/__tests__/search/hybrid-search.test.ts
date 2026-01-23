@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
  */
 
 // Recreate the scoring logic for testing (extracted from indexer.ts)
-function calculateKeywordScore(query: string, content: string, filePath: string): number {
+function calculateKeywordScore(query: string, content: string, filepath: string): number {
   const queryTerms = query
     .toLowerCase()
     .split(/\s+/)
@@ -14,7 +14,7 @@ function calculateKeywordScore(query: string, content: string, filePath: string)
   if (queryTerms.length === 0) return 0;
 
   const contentLower = content.toLowerCase();
-  const filePathLower = filePath.toLowerCase();
+  const filepathLower = filepath.toLowerCase();
 
   let matchCount = 0;
   let exactMatchBonus = 0;
@@ -32,7 +32,7 @@ function calculateKeywordScore(query: string, content: string, filePath: string)
     }
 
     // Bonus for filename/path match
-    if (filePathLower.includes(term)) {
+    if (filepathLower.includes(term)) {
       matchCount += 0.5;
     }
   }

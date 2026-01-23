@@ -20,7 +20,7 @@ export interface CodeChunk {
   /** Unique identifier for this chunk (format: filepath:startLine-endLine) */
   id: string;
   /** Relative path to the source file from the project root */
-  filePath: string;
+  filepath: string;
   /** The actual source code content of this chunk */
   content: string;
   /** Starting line number in the source file (1-indexed) */
@@ -65,7 +65,7 @@ interface IndexMetadata {
 
 // Note: FileMetadata is used for LanceDB schema and is implicitly typed
 // interface FileMetadata {
-//   filePath: string;
+//   filepath: string;
 //   mtime: number;
 // }
 
@@ -100,14 +100,14 @@ export type ProgressCallback = (progress: IndexProgress) => void;
  * Sanitize a file path for use in LanceDB filter expressions.
  * Prevents SQL injection by only allowing safe path characters.
  */
-function sanitizePathForFilter(filePath: string): string {
+function sanitizePathForFilter(filepath: string): string {
   // Only allow safe file path characters: alphanumeric, /, ., -, _, space
   // This is more restrictive than escaping and prevents injection attacks
-  if (!/^[\w\s./-]+$/.test(filePath)) {
+  if (!/^[\w\s./-]+$/.test(filepath)) {
     // If path contains unusual characters, escape single quotes and backslashes
-    return filePath.replace(/\\/g, '\\\\').replace(/'/g, "''");
+    return filepath.replace(/\\/g, '\\\\').replace(/'/g, "''");
   }
-  return filePath.replace(/'/g, "''");
+  return filepath.replace(/'/g, "''");
 }
 
 /**
@@ -187,8 +187,8 @@ export class CodeIndexer {
   /**
    * Get the modification time of a file
    */
-  private async getFileMtime(filePath: string): Promise<number> {
-    const stats = await fs.stat(filePath);
+  private async getFileMtime(filepath: string): Promise<number> {
+    const stats = await fs.stat(filepath);
     return stats.mtimeMs;
   }
 
@@ -205,7 +205,7 @@ export class CodeIndexer {
     const rows = await this.metadataTable.query().toArray();
     const metadata = new Map<string, number>();
     for (const row of rows) {
-      metadata.set(row.filePath, row.mtime);
+      metadata.set(row.filepath, row.mtime);
     }
     return metadata;
   }
@@ -224,18 +224,18 @@ export class CodeIndexer {
 
     const currentFilesSet = new Set<string>();
 
-    for (const filePath of currentFiles) {
-      const relativePath = path.relative(this.projectPath, filePath);
+    for (const filepath of currentFiles) {
+      const relativePath = path.relative(this.projectPath, filepath);
       currentFilesSet.add(relativePath);
-      const currentMtime = await this.getFileMtime(filePath);
+      const currentMtime = await this.getFileMtime(filepath);
       const storedMtime = storedMetadata.get(relativePath);
 
       if (storedMtime === undefined) {
-        changes.added.push(filePath);
+        changes.added.push(filepath);
       } else if (currentMtime > storedMtime) {
-        changes.modified.push(filePath);
+        changes.modified.push(filepath);
       } else {
-        changes.unchanged.push(filePath);
+        changes.unchanged.push(filepath);
       }
     }
 
@@ -253,11 +253,11 @@ export class CodeIndexer {
    * Save metadata for indexed files
    */
   private async saveFileMetadata(files: string[]): Promise<void> {
-    const metadata: Array<{ filePath: string; mtime: number }> = [];
-    for (const filePath of files) {
-      const relativePath = path.relative(this.projectPath, filePath);
-      const mtime = await this.getFileMtime(filePath);
-      metadata.push({ filePath: relativePath, mtime });
+    const metadata: Array<{ filepath: string; mtime: number }> = [];
+    for (const filepath of files) {
+      const relativePath = path.relative(this.projectPath, filepath);
+      const mtime = await this.getFileMtime(filepath);
+      metadata.push({ filepath: relativePath, mtime });
     }
 
     // Drop and recreate metadata table
@@ -413,7 +413,7 @@ export class CodeIndexer {
     // Store in LanceDB
     const data = allChunks.map((chunk) => ({
       id: chunk.id,
-      filePath: chunk.filePath,
+      filepath: chunk.filepath,
       content: chunk.content,
       startLine: chunk.startLine,
       endLine: chunk.endLine,
@@ -493,7 +493,7 @@ export class CodeIndexer {
     if (filesToRemove.length > 0) {
       for (const relativePath of filesToRemove) {
         const sanitizedPath = sanitizePathForFilter(relativePath);
-        await this.table.delete(`filePath = '${sanitizedPath}'`);
+        await this.table.delete(`filepath = '${sanitizedPath}'`);
       }
       report({
         phase: 'chunking',
@@ -524,7 +524,7 @@ export class CodeIndexer {
       // Add new chunks to the table
       const data = newChunks.map((chunk) => ({
         id: chunk.id,
-        filePath: chunk.filePath,
+        filepath: chunk.filepath,
         content: chunk.content,
         startLine: chunk.startLine,
         endLine: chunk.endLine,
@@ -579,15 +579,15 @@ export class CodeIndexer {
     }
   }
 
-  private async chunkFile(filePath: string): Promise<CodeChunk[]> {
-    const ext = path.extname(filePath).slice(1);
+  private async chunkFile(filepath: string): Promise<CodeChunk[]> {
+    const ext = path.extname(filepath).slice(1);
     const language = this.getLanguage(ext);
-    const relativePath = path.relative(this.projectPath, filePath);
+    const relativePath = path.relative(this.projectPath, filepath);
 
     // Try AST-aware chunking for supported languages
-    if (ASTChunker.canParse(filePath)) {
+    if (ASTChunker.canParse(filepath)) {
       try {
-        return await this.chunkFileWithAST(filePath, relativePath, language);
+        return await this.chunkFileWithAST(filepath, relativePath, language);
       } catch {
         // Fall back to line-based chunking if AST parsing fails
         console.error(
@@ -597,23 +597,23 @@ export class CodeIndexer {
     }
 
     // Line-based chunking for unsupported languages or as fallback
-    return this.chunkFileByLines(filePath, relativePath, language);
+    return this.chunkFileByLines(filepath, relativePath, language);
   }
 
   /**
    * Chunk a file using AST-aware parsing
    */
   private async chunkFileWithAST(
-    filePath: string,
+    filepath: string,
     relativePath: string,
     language: string
   ): Promise<CodeChunk[]> {
     const astChunker = new ASTChunker();
-    const astChunks = await astChunker.chunkFile(filePath);
+    const astChunks = await astChunker.chunkFile(filepath);
 
     return astChunks.map((chunk) => ({
       id: `${relativePath}:${chunk.startLine}-${chunk.endLine}${chunk.name ? `:${chunk.name}` : ''}`,
-      filePath: relativePath,
+      filepath: relativePath,
       content: chunk.content,
       startLine: chunk.startLine,
       endLine: chunk.endLine,
@@ -625,11 +625,11 @@ export class CodeIndexer {
    * Chunk a file using line-based splitting (fallback)
    */
   private async chunkFileByLines(
-    filePath: string,
+    filepath: string,
     relativePath: string,
     language: string
   ): Promise<CodeChunk[]> {
-    const content = await fs.readFile(filePath, 'utf-8');
+    const content = await fs.readFile(filepath, 'utf-8');
     const lines = content.split('\n');
     const chunkingConfig = getChunkingConfig(this.config!);
     const chunkSize = chunkingConfig.maxLines;
@@ -644,7 +644,7 @@ export class CodeIndexer {
 
       chunks.push({
         id: `${relativePath}:${i + 1}-${i + chunkLines.length}`,
-        filePath: relativePath,
+        filepath: relativePath,
         content: chunkContent,
         startLine: i + 1,
         endLine: i + chunkLines.length,
@@ -703,7 +703,7 @@ export class CodeIndexer {
       const semanticScore = 1 - index / fetchLimit;
 
       // Keyword score: based on query term matches
-      const keywordScore = this.calculateKeywordScore(query, r.content, r.filePath);
+      const keywordScore = this.calculateKeywordScore(query, r.content, r.filepath);
 
       // Combined score using configurable weights
       const combinedScore =
@@ -717,7 +717,7 @@ export class CodeIndexer {
 
     return scoredResults.slice(0, limit).map((sr) => ({
       id: sr.result.id,
-      filePath: sr.result.filePath,
+      filepath: sr.result.filepath,
       content: sr.result.content,
       startLine: sr.result.startLine,
       endLine: sr.result.endLine,
@@ -728,7 +728,7 @@ export class CodeIndexer {
   /**
    * Calculate keyword match score for hybrid search
    */
-  private calculateKeywordScore(query: string, content: string, filePath: string): number {
+  private calculateKeywordScore(query: string, content: string, filepath: string): number {
     const queryTerms = query
       .toLowerCase()
       .split(/\s+/)
@@ -736,7 +736,7 @@ export class CodeIndexer {
     if (queryTerms.length === 0) return 0;
 
     const contentLower = content.toLowerCase();
-    const filePathLower = filePath.toLowerCase();
+    const filepathLower = filepath.toLowerCase();
 
     let matchCount = 0;
     let exactMatchBonus = 0;
@@ -754,7 +754,7 @@ export class CodeIndexer {
       }
 
       // Bonus for filename/path match
-      if (filePathLower.includes(term)) {
+      if (filepathLower.includes(term)) {
         matchCount += 0.5;
       }
     }

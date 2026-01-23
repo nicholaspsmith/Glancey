@@ -4,17 +4,54 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { exec } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 import { createEmbeddingBackend } from './embeddings/index.js';
 import { CodeIndexer } from './search/indexer.js';
 import { isStringArray, isString, isNumber, isBoolean } from './utils/type-guards.js';
 import { loadConfig, getInstructions, getDashboardConfig } from './config.js';
-import { startDashboard, dashboardState, sseManager } from './dashboard/index.js';
+import { startDashboard, dashboardState, isPortAvailable } from './dashboard/index.js';
 import type { CommandName } from './dashboard/index.js';
+
+/**
+ * Check if browser was recently opened (within the last hour)
+ */
+function wasBrowserRecentlyOpened(projectPath: string): boolean {
+  const flagFile = path.join(projectPath, '.lance-context', 'browser-opened');
+  try {
+    if (fs.existsSync(flagFile)) {
+      const timestamp = parseInt(fs.readFileSync(flagFile, 'utf-8'), 10);
+      const oneHourAgo = Date.now() - 60 * 60 * 1000;
+      return timestamp > oneHourAgo;
+    }
+  } catch {
+    // Ignore errors
+  }
+  return false;
+}
+
+/**
+ * Record that browser was opened
+ */
+function recordBrowserOpened(projectPath: string): void {
+  const flagFile = path.join(projectPath, '.lance-context', 'browser-opened');
+  try {
+    fs.writeFileSync(flagFile, Date.now().toString());
+  } catch {
+    // Ignore errors
+  }
+}
 
 /**
  * Open a URL in the user's default browser (cross-platform)
  */
-function openBrowser(url: string): void {
+function openBrowser(url: string, projectPath: string): void {
+  // Don't open if already opened recently
+  if (wasBrowserRecentlyOpened(projectPath)) {
+    console.error('[lance-context] Dashboard was recently opened, skipping');
+    return;
+  }
+
   const platform = process.platform;
   let command: string;
 
@@ -33,6 +70,8 @@ function openBrowser(url: string): void {
   exec(command, (error) => {
     if (error) {
       console.error('[lance-context] Failed to open browser:', error.message);
+    } else {
+      recordBrowserOpened(projectPath);
     }
   });
 }
@@ -220,7 +259,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const formatted = results
           .map(
             (r, i) =>
-              `## Result ${i + 1}: ${r.filePath}:${r.startLine}-${r.endLine}\n\`\`\`${r.language}\n${r.content}\n\`\`\``
+              `## Result ${i + 1}: ${r.filepath}:${r.startLine}-${r.endLine}\n\`\`\`${r.language}\n${r.content}\n\`\`\``
           )
           .join('\n\n');
         return {
@@ -328,27 +367,28 @@ async function main() {
 
   // Start dashboard if enabled
   if (dashboardConfig.enabled) {
-    try {
-      const dashboard = await startDashboard({
-        port: dashboardConfig.port,
-        config,
-        projectPath: PROJECT_PATH,
-      });
-      console.error(`[lance-context] Dashboard started at ${dashboard.url}`);
+    const dashboardPort = dashboardConfig.port || 24300;
+    const portAvailable = await isPortAvailable(dashboardPort);
 
-      // Open dashboard in user's default browser if configured
-      // Wait briefly to see if there are already connected clients (existing tabs)
-      if (dashboardConfig.openBrowser) {
-        setTimeout(() => {
-          if (sseManager.getClientCount() === 0) {
-            openBrowser(dashboard.url);
-          } else {
-            console.error('[lance-context] Dashboard already open in browser, skipping');
-          }
-        }, 500);
+    if (!portAvailable) {
+      // Another process is already running the dashboard
+      console.error(`[lance-context] Dashboard already running on port ${dashboardPort}`);
+    } else {
+      try {
+        const dashboard = await startDashboard({
+          port: dashboardPort,
+          config,
+          projectPath: PROJECT_PATH,
+        });
+        console.error(`[lance-context] Dashboard started at ${dashboard.url}`);
+
+        // Open dashboard in user's default browser if configured
+        if (dashboardConfig.openBrowser) {
+          openBrowser(dashboard.url, PROJECT_PATH);
+        }
+      } catch (error) {
+        console.error('[lance-context] Failed to start dashboard:', error);
       }
-    } catch (error) {
-      console.error('[lance-context] Failed to start dashboard:', error);
     }
   }
 

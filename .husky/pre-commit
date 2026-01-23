@@ -1,5 +1,20 @@
 #!/bin/sh
 
+# Block direct commits to main branch
+current_branch=$(git branch --show-current)
+if [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ]; then
+  echo ""
+  echo "❌ ERROR: Direct commits to '$current_branch' are not allowed!"
+  echo ""
+  echo "Please create a feature branch first:"
+  echo "  git checkout -b feature/your-feature-name"
+  echo ""
+  echo "Then commit your changes and create a PR."
+  echo "See .claude/rules.md for the full workflow."
+  echo ""
+  exit 1
+fi
+
 # Reminder for Claude: Review .claude/rules.md before committing
 # Ensure commits follow project standards:
 # - One responsibility per commit
