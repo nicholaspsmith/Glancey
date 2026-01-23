@@ -1,5 +1,14 @@
 # Claude Code Preferences
 
+## ⚠️ SESSION START - READ FIRST
+
+**Before making any changes, read `.claude/rules.md` for project standards.**
+
+Key requirements:
+- **NEVER commit directly to main** - always create a feature branch first
+- **One responsibility per commit** - split multiple changes into separate commits
+- **Use lance-context** for semantic code search, not Grep/Read for exploration
+
 ## Command Preferences
 
 - Use `fd` instead of `find` for file searching
@@ -24,10 +33,17 @@ This project uses **lance-context** for semantic code search. When exploring the
 
 For embeddings, use **Jina** or **Ollama** instead.
 
-## Commit Guidelines
+## Pre-Commit Checklist
 
-Review `.claude/rules.md` before committing. Key rules:
-- One responsibility per commit
-- Subject line under 72 characters
-- Imperative mood ("Add" not "Added")
-- Body contains only "Co-Authored-By: Claude <noreply@anthropic.com>"
+**STOP! Before committing, verify:**
+
+1. [ ] Read `.claude/rules.md` (required every time)
+2. [ ] On a feature branch, NOT main (`git branch --show-current`)
+3. [ ] Each commit has exactly ONE responsibility
+4. [ ] Subject line under 72 characters, imperative mood
+5. [ ] Body contains ONLY "Co-Authored-By: Claude <noreply@anthropic.com>"
+
+```bash
+# Create feature branch first!
+git checkout -b feature/your-feature-name
+```

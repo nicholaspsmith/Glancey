@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 
 export interface MockRow {
   id: string;
-  filePath: string;
+  filepath: string;
   content: string;
   startLine: number;
   endLine: number;
@@ -26,11 +26,11 @@ export function createMockTable(initialData: MockRow[] = []) {
       data.push(...rows);
     }),
     delete: vi.fn().mockImplementation(async (filter: string) => {
-      // Simple filter parsing for "filePath = 'value'"
-      const match = filter.match(/filePath = '(.+)'/);
+      // Simple filter parsing for "filepath = 'value'"
+      const match = filter.match(/filepath = '(.+)'/);
       if (match) {
         const pathToDelete = match[1].replace(/''/g, "'");
-        data = data.filter((row) => row.filePath !== pathToDelete);
+        data = data.filter((row) => row.filepath !== pathToDelete);
       }
     }),
     countRows: vi.fn().mockImplementation(async () => data.length),
