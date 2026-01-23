@@ -13,6 +13,10 @@ import {
   type LanceContextConfig,
 } from '../config.js';
 import { minimatch } from 'minimatch';
+import { mapInBatches } from '../utils/concurrency.js';
+
+/** Default concurrency for parallel file processing */
+const FILE_PROCESSING_CONCURRENCY = 10;
 
 /**
  * Represents a chunk of code that has been indexed.
@@ -459,22 +463,24 @@ export class CodeIndexer {
       onProgress?.(progress);
     };
 
-    // Process files into chunks
+    // Process files into chunks (parallelized for I/O efficiency)
     report({ phase: 'chunking', current: 0, total: files.length, message: 'Chunking files...' });
 
-    const allChunks: CodeChunk[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const chunks = await this.chunkFile(files[i]);
-      allChunks.push(...chunks);
-      if ((i + 1) % 50 === 0 || i === files.length - 1) {
+    const chunkResults = await mapInBatches(
+      files,
+      async (filepath) => this.chunkFile(filepath),
+      FILE_PROCESSING_CONCURRENCY,
+      (completed, total) => {
         report({
           phase: 'chunking',
-          current: i + 1,
-          total: files.length,
-          message: `Chunked ${i + 1}/${files.length} files (${allChunks.length} chunks)`,
+          current: completed,
+          total,
+          message: `Chunked ${completed}/${total} files`,
         });
       }
-    }
+    );
+
+    const allChunks = chunkResults.flat();
 
     report({
       phase: 'chunking',
@@ -579,13 +585,23 @@ export class CodeIndexer {
       });
     }
 
-    // Process new and modified files
+    // Process new and modified files (parallelized for I/O efficiency)
     if (filesToProcess.length > 0) {
-      const newChunks: CodeChunk[] = [];
-      for (let i = 0; i < filesToProcess.length; i++) {
-        const chunks = await this.chunkFile(filesToProcess[i]);
-        newChunks.push(...chunks);
-      }
+      const chunkResults = await mapInBatches(
+        filesToProcess,
+        async (filepath) => this.chunkFile(filepath),
+        FILE_PROCESSING_CONCURRENCY,
+        (completed, total) => {
+          report({
+            phase: 'chunking',
+            current: completed,
+            total,
+            message: `Chunked ${completed}/${total} files`,
+          });
+        }
+      );
+
+      const newChunks = chunkResults.flat();
 
       report({
         phase: 'chunking',
