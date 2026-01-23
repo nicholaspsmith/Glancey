@@ -13,7 +13,8 @@ export type CommandName =
   | 'search_similar'
   | 'get_index_status'
   | 'clear_index'
-  | 'get_project_instructions';
+  | 'get_project_instructions'
+  | 'commit';
 
 /**
  * Command usage statistics
@@ -49,6 +50,7 @@ const COMMAND_LABELS: Record<CommandName, string> = {
   get_index_status: 'Get Status',
   clear_index: 'Clear Index',
   get_project_instructions: 'Get Instructions',
+  commit: 'Commit',
 };
 
 export class DashboardStateManager extends EventEmitter {
@@ -226,6 +228,7 @@ export class DashboardStateManager extends EventEmitter {
       'get_index_status',
       'clear_index',
       'get_project_instructions',
+      'commit',
     ];
 
     return allCommands.map((command) => ({
