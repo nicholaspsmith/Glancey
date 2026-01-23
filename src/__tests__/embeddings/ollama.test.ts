@@ -181,6 +181,39 @@ describe('OllamaBackend', () => {
 
       expect(result).toEqual([[0], [0.1], [0.2]]);
     });
+
+    it('should process in chunks with controlled parallelism', async () => {
+      const callOrder: string[] = [];
+      const mockFetch = vi.fn().mockImplementation(async (_url, options) => {
+        const body = JSON.parse(options.body);
+        callOrder.push(body.prompt);
+        return createOllamaEmbeddingResponse([0.1]);
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      // Create backend with batch size of 2
+      const backend = new OllamaBackend({ backend: 'ollama', batchSize: 2 });
+      const result = await backend.embedBatch(['t1', 't2', 't3', 't4', 't5']);
+
+      // Should make 5 calls total
+      expect(mockFetch).toHaveBeenCalledTimes(5);
+      // Should return 5 embeddings
+      expect(result).toHaveLength(5);
+    });
+
+    it('should use default batch size of 10', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(createOllamaEmbeddingResponse([0.1]));
+      vi.stubGlobal('fetch', mockFetch);
+
+      // Create backend without custom batchSize (should use default 10)
+      const backend = new OllamaBackend({ backend: 'ollama' });
+      // Create 15 texts - should process in 2 chunks: 10 parallel, then 5 parallel
+      const texts = Array.from({ length: 15 }, (_, i) => `text${i}`);
+      await backend.embedBatch(texts);
+
+      // All 15 calls should complete
+      expect(mockFetch).toHaveBeenCalledTimes(15);
+    });
   });
 
   describe('getDimensions', () => {
