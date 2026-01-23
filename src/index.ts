@@ -167,6 +167,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'number',
               description: 'Maximum number of results (default: 10)',
             },
+            pathPattern: {
+              type: 'string',
+              description:
+                "Glob pattern to filter results by file path (e.g., 'src/**/*.ts', '!**/*.test.ts')",
+            },
+            languages: {
+              type: 'array',
+              items: { type: 'string' },
+              description:
+                "Filter results to specific languages (e.g., ['typescript', 'javascript'])",
+            },
           },
           required: ['query'],
         },
@@ -300,8 +311,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (!query) {
           throw new Error('query is required');
         }
-        const limit = isNumber(args?.limit) ? args.limit : 10;
-        const results = await idx.search(query, limit);
+        const results = await idx.search({
+          query,
+          limit: isNumber(args?.limit) ? args.limit : 10,
+          pathPattern: isString(args?.pathPattern) ? args.pathPattern : undefined,
+          languages: isStringArray(args?.languages) ? args.languages : undefined,
+        });
         const formatted = results
           .map(
             (r, i) =>
