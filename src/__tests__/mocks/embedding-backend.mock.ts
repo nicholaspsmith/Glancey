@@ -8,6 +8,7 @@ export function createMockEmbeddingBackend(
   overrides: Partial<EmbeddingBackend> = {}
 ): EmbeddingBackend {
   const dimensions = overrides.getDimensions?.() ?? 1536;
+  const model = overrides.getModel?.() ?? 'mock-model';
 
   return {
     name: 'mock',
@@ -25,6 +26,7 @@ export function createMockEmbeddingBackend(
       );
     }),
     getDimensions: vi.fn().mockReturnValue(dimensions),
+    getModel: vi.fn().mockReturnValue(model),
     ...overrides,
   };
 }
@@ -39,5 +41,6 @@ export function createFailingMockEmbeddingBackend(error: Error): EmbeddingBacken
     embed: vi.fn().mockRejectedValue(error),
     embedBatch: vi.fn().mockRejectedValue(error),
     getDimensions: vi.fn().mockReturnValue(1536),
+    getModel: vi.fn().mockReturnValue('failing-mock-model'),
   };
 }
