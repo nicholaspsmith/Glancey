@@ -1,9 +1,11 @@
 import type { EmbeddingBackend, EmbeddingConfig } from './types.js';
 import { fetchWithRetry } from './retry.js';
+import { RateLimiter } from './rate-limiter.js';
 
 /**
  * Jina AI embedding backend
  * Uses Jina's free API tier for high-quality embeddings
+ * Includes client-side rate limiting to prevent API throttling
  */
 export class JinaBackend implements EmbeddingBackend {
   name = 'jina';
@@ -11,6 +13,7 @@ export class JinaBackend implements EmbeddingBackend {
   private apiKey: string;
   private baseUrl = 'https://api.jina.ai/v1/embeddings';
   private dimensions = 1024; // jina-embeddings-v3 default
+  private rateLimiter: RateLimiter;
 
   constructor(config: EmbeddingConfig) {
     this.model = config.model || 'jina-embeddings-v3';
@@ -18,6 +21,12 @@ export class JinaBackend implements EmbeddingBackend {
       throw new Error('Jina API key is required. Set JINA_API_KEY environment variable.');
     }
     this.apiKey = config.apiKey;
+
+    // Initialize rate limiter with configurable or default values
+    this.rateLimiter = new RateLimiter({
+      requestsPerSecond: config.rateLimitRps ?? 5,
+      burstCapacity: config.rateLimitBurst ?? 10,
+    });
   }
 
   async initialize(): Promise<void> {
@@ -30,6 +39,9 @@ export class JinaBackend implements EmbeddingBackend {
   }
 
   async embed(text: string): Promise<number[]> {
+    // Acquire a rate limit token before making the request
+    await this.rateLimiter.acquire();
+
     const response = await fetchWithRetry(this.baseUrl, {
       method: 'POST',
       headers: {
@@ -52,6 +64,10 @@ export class JinaBackend implements EmbeddingBackend {
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
+    // Acquire a rate limit token before making the request
+    // Note: batch requests count as one API call
+    await this.rateLimiter.acquire();
+
     const response = await fetchWithRetry(this.baseUrl, {
       method: 'POST',
       headers: {

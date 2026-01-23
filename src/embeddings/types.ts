@@ -55,6 +55,12 @@ export interface EmbeddingConfig {
 
   /** Base URL for the embedding API (useful for Ollama or custom endpoints) */
   baseUrl?: string;
+
+  /** Rate limiting: maximum requests per second (default: 5 for Jina) */
+  rateLimitRps?: number;
+
+  /** Rate limiting: maximum burst capacity (default: 10) */
+  rateLimitBurst?: number;
 }
 
 /**
