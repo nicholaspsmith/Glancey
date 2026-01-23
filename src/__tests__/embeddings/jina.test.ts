@@ -161,6 +161,36 @@ describe('JinaBackend', () => {
         'Jina API error: 400 - Bad request'
       );
     });
+
+    it('should chunk large batches and make multiple requests', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockImplementation(() => createJinaEmbeddingResponse([[0.1], [0.2]]));
+      vi.stubGlobal('fetch', mockFetch);
+
+      // Create backend with batch size of 2
+      const backend = new JinaBackend({ backend: 'jina', apiKey: 'test-key', batchSize: 2 });
+      const result = await backend.embedBatch(['text1', 'text2', 'text3', 'text4', 'text5']);
+
+      // Should make 3 requests: [text1, text2], [text3, text4], [text5]
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      // Should return all 5 embeddings (though mock returns 2 per call, so we get 6)
+      expect(result).toHaveLength(6);
+    });
+
+    it('should not chunk when batch is smaller than batch size', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValue(createJinaEmbeddingResponse([[0.1], [0.2], [0.3]]));
+      vi.stubGlobal('fetch', mockFetch);
+
+      // Create backend with batch size of 100 (larger than input)
+      const backend = new JinaBackend({ backend: 'jina', apiKey: 'test-key', batchSize: 100 });
+      await backend.embedBatch(['text1', 'text2', 'text3']);
+
+      // Should make only 1 request
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('getDimensions', () => {
