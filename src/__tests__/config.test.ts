@@ -136,6 +136,116 @@ describe('config', () => {
       // Should have default overlap
       expect(config.chunking?.overlap).toBeDefined();
     });
+
+    it('should salvage valid fields when some fields are invalid', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const invalidConfig = {
+        patterns: ['**/*.ts'], // valid
+        chunking: {
+          maxLines: '100', // invalid: should be number
+          overlap: 10, // valid
+        },
+        search: {
+          semanticWeight: 1.5, // invalid: exceeds max 1.0
+          keywordWeight: 0.5, // valid
+        },
+      };
+      vi.mocked(fs.readFile).mockResolvedValueOnce(JSON.stringify(invalidConfig));
+
+      const config = await loadConfig('/project');
+
+      // Valid patterns should be preserved
+      expect(config.patterns).toEqual(['**/*.ts']);
+      // Valid overlap should be preserved
+      expect(config.chunking?.overlap).toBe(10);
+      // Valid keywordWeight should be preserved
+      expect(config.search?.keywordWeight).toBe(0.5);
+      // Invalid fields should fall back to defaults
+      expect(typeof config.chunking?.maxLines).toBe('number');
+      expect(config.search?.semanticWeight).toBeLessThanOrEqual(1);
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should warn about invalid JSON syntax', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      // Invalid JSON with trailing comma
+      vi.mocked(fs.readFile)
+        .mockRejectedValueOnce(
+          Object.assign(new SyntaxError('Unexpected token'), { name: 'SyntaxError' })
+        )
+        .mockRejectedValueOnce(new Error('ENOENT'));
+
+      // Create a proper SyntaxError and simulate what the JSON.parse would throw
+      const syntaxError = new SyntaxError('Unexpected token } in JSON');
+      vi.mocked(fs.readFile).mockReset();
+      vi.mocked(fs.readFile).mockImplementation(() => {
+        throw syntaxError;
+      });
+
+      const config = await loadConfig('/project');
+
+      // Should fall back to defaults
+      expect(config.patterns).toBeDefined();
+      // Should have warned about JSON syntax
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid JSON'));
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should show detailed error for type mismatches', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const invalidConfig = {
+        chunking: {
+          maxLines: '100', // string instead of number
+        },
+      };
+      vi.mocked(fs.readFile).mockResolvedValueOnce(JSON.stringify(invalidConfig));
+
+      await loadConfig('/project');
+
+      // Should warn with details about the type mismatch
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('chunking.maxLines'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Expected number'));
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should show detailed error for out-of-range values', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const invalidConfig = {
+        search: {
+          semanticWeight: 1.5, // exceeds max 1.0
+        },
+      };
+      vi.mocked(fs.readFile).mockResolvedValueOnce(JSON.stringify(invalidConfig));
+
+      await loadConfig('/project');
+
+      // Should warn about the value exceeding the maximum
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('search.semanticWeight'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('exceeds maximum'));
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should show detailed error for invalid enum values', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const invalidConfig = {
+        embedding: {
+          backend: 'invalid-backend', // not 'jina' or 'ollama'
+        },
+      };
+      vi.mocked(fs.readFile).mockResolvedValueOnce(JSON.stringify(invalidConfig));
+
+      await loadConfig('/project');
+
+      // Should warn about invalid enum value
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('embedding.backend'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Valid options'));
+
+      consoleSpy.mockRestore();
+    });
   });
 
   describe('getChunkingConfig', () => {
