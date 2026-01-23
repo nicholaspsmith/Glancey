@@ -21,10 +21,12 @@
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist coverage .lance-context",
     "prepublishOnly": "npm run build",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "node scripts/postinstall.js || true"
   },
   "files": [
     "dist",
+    "scripts",
     "README.md"
   ],
   "repository": {
