@@ -21,17 +21,17 @@ export class ASTChunker {
   /**
    * Check if a file can be parsed with AST chunking
    */
-  static canParse(filePath: string): boolean {
-    const ext = path.extname(filePath).toLowerCase();
+  static canParse(filepath: string): boolean {
+    const ext = path.extname(filepath).toLowerCase();
     return ['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs'].includes(ext);
   }
 
   /**
    * Parse a file and return AST-aware chunks
    */
-  async chunkFile(filePath: string): Promise<ASTChunk[]> {
-    const content = await fs.readFile(filePath, 'utf-8');
-    const ext = path.extname(filePath).toLowerCase();
+  async chunkFile(filepath: string): Promise<ASTChunk[]> {
+    const content = await fs.readFile(filepath, 'utf-8');
+    const ext = path.extname(filepath).toLowerCase();
 
     // Determine script kind
     let scriptKind = ts.ScriptKind.TS;
@@ -43,7 +43,7 @@ export class ASTChunker {
 
     // Parse the file
     const sourceFile = ts.createSourceFile(
-      filePath,
+      filepath,
       content,
       ts.ScriptTarget.Latest,
       true,
