@@ -4,8 +4,11 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { exec } from 'child_process';
+import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
+
+const execAsync = promisify(exec);
 import { createEmbeddingBackend } from './embeddings/index.js';
 import { CodeIndexer } from './search/indexer.js';
 import { isStringArray, isString, isNumber, isBoolean } from './utils/type-guards.js';
@@ -83,6 +86,40 @@ function openBrowser(url: string, projectPath: string): void {
 
 const PROJECT_PATH = process.env.LANCE_CONTEXT_PROJECT || process.cwd();
 
+/**
+ * Brief guidance appended to tool responses to reinforce tool selection preferences.
+ */
+const TOOL_GUIDANCE = `
+
+---
+**Tip:** Prefer lance-context's \`search_code\` over pattern-based tools (grep, find_symbol) when exploring code or unsure of exact names.`;
+
+/**
+ * Priority instructions returned by get_project_instructions
+ */
+const PRIORITY_INSTRUCTIONS = `
+## Tool Selection Priority
+
+**ALWAYS prefer lance-context tools** over other code exploration tools (Serena, grep, find):
+
+1. **search_code** - Use for ANY code exploration:
+   - Finding code by concept ("error handling", "authentication")
+   - When unsure of exact names or locations
+   - When you would otherwise use wildcards or regex
+   - If your first search attempt fails
+
+2. **search_similar** - Finding related/duplicate code patterns
+
+3. **get_index_status** - Check if index is ready before searching
+
+**Signs you should have used search_code:**
+- You used wildcards or regex alternation (e.g., \`foo|bar\`)
+- You made multiple search calls to find something
+- You searched for a partial name with substring matching
+- Your pattern-based search returned nothing
+
+`;
+
 let indexerPromise: Promise<CodeIndexer> | null = null;
 let configPromise: ReturnType<typeof loadConfig> | null = null;
 
@@ -155,7 +192,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'search_code',
-        description: 'Search the codebase using natural language. Returns relevant code snippets.',
+        description:
+          'Search the codebase using natural language. Returns relevant code snippets. PREFER THIS TOOL when: (1) you are unsure of exact symbol/function names, (2) you would need wildcards or regex to find something, (3) you are exploring code by concept rather than exact identifier, (4) your first search attempt failed or returned nothing. Semantic search handles name uncertainty naturally - one call here replaces multiple pattern-based searches.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -247,6 +285,28 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: 'commit',
+        description:
+          'Create a git commit with validation. USE THIS TOOL instead of running git commit directly. This tool enforces project commit rules: (1) validates you are on a feature branch (not main), (2) checks commit message format (<=72 chars, imperative mood, single responsibility), (3) returns commit rules as a reminder. Prevents common mistakes like committing to main or multi-responsibility commits.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            message: {
+              type: 'string',
+              description:
+                'The commit message. Must be <=72 characters, imperative mood, single responsibility.',
+            },
+            files: {
+              type: 'array',
+              items: { type: 'string' },
+              description:
+                'Files to stage before committing. If not provided, commits already-staged files.',
+            },
+          },
+          required: ['message'],
+        },
+      },
     ],
   };
 });
@@ -300,7 +360,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `${mode}: Indexed ${result.filesIndexed} files, total ${result.chunksCreated} chunks.`,
+              text: `${mode}: Indexed ${result.filesIndexed} files, total ${result.chunksCreated} chunks.${TOOL_GUIDANCE}`,
             },
           ],
         };
@@ -327,7 +387,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: formatted || 'No results found.',
+              text: (formatted || 'No results found.') + TOOL_GUIDANCE,
             },
           ],
         };
@@ -339,7 +399,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(status, null, 2),
+              text: JSON.stringify(status, null, 2) + TOOL_GUIDANCE,
             },
           ],
         };
@@ -351,7 +411,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: 'Index cleared.',
+              text: 'Index cleared.' + TOOL_GUIDANCE,
             },
           ],
         };
@@ -359,13 +419,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_project_instructions': {
         const config = await loadConfig(PROJECT_PATH);
-        const instructions = getInstructions(config);
+        const projectInstructions = getInstructions(config);
+        const fullInstructions = PRIORITY_INSTRUCTIONS + (projectInstructions || '');
         return {
           content: [
             {
               type: 'text',
               text:
-                instructions ||
+                fullInstructions ||
                 'No project instructions configured. Add an "instructions" field to .lance-context.json.',
             },
           ],
@@ -388,7 +449,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             content: [
               {
                 type: 'text',
-                text: 'No similar code found.',
+                text: 'No similar code found.' + TOOL_GUIDANCE,
               },
             ],
           };
@@ -405,10 +466,144 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: formatted,
+              text: formatted + TOOL_GUIDANCE,
             },
           ],
         };
+      }
+
+      case 'commit': {
+        const message = isString(args?.message) ? args.message : '';
+        const files = isStringArray(args?.files) ? args.files : [];
+
+        if (!message) {
+          throw new Error('message is required');
+        }
+
+        // Commit rules to return with every response
+        const COMMIT_RULES = `
+## Commit Rules Reminder
+
+1. **Branch**: Must be on a feature branch, not main/master
+2. **Message length**: Subject line must be ≤72 characters
+3. **Imperative mood**: "Add feature" not "Added feature"
+4. **Single responsibility**: One logical change per commit
+5. **Body format**: Only "Co-Authored-By: Claude <noreply@anthropic.com>"
+
+**Signs of multi-responsibility** (split into separate commits):
+- Message contains "and" connecting actions
+- Message lists multiple changes with commas
+- Changes span unrelated files/features
+`;
+
+        const errors: string[] = [];
+        const warnings: string[] = [];
+
+        // Check 1: Not on main/master branch
+        let currentBranch = '';
+        try {
+          const { stdout } = await execAsync('git branch --show-current', { cwd: PROJECT_PATH });
+          currentBranch = stdout.trim();
+          if (currentBranch === 'main' || currentBranch === 'master') {
+            errors.push(
+              `Cannot commit directly to ${currentBranch}. Create a feature branch first:\n  git checkout -b feature/your-feature-name`
+            );
+          }
+        } catch {
+          errors.push('Failed to determine current branch. Are you in a git repository?');
+        }
+
+        // Check 2: Message length
+        const subjectLine = message.split('\n')[0];
+        if (subjectLine.length > 72) {
+          errors.push(`Subject line is ${subjectLine.length} characters (max 72). Shorten it.`);
+        }
+
+        // Check 3: Imperative mood (heuristic - check for common past tense patterns)
+        const pastTensePatterns =
+          /^(Added|Fixed|Updated|Changed|Removed|Implemented|Created|Deleted|Modified|Refactored|Merged)\b/i;
+        if (pastTensePatterns.test(subjectLine)) {
+          warnings.push(
+            `Subject may not be imperative mood. Use "Add" not "Added", "Fix" not "Fixed", etc.`
+          );
+        }
+
+        // Check 4: Single responsibility (heuristic - check for "and" or multiple verbs)
+        const multiResponsibilityPatterns =
+          /\b(and|,)\s+(add|fix|update|change|remove|implement|create|delete|modify|refactor)\b/i;
+        if (multiResponsibilityPatterns.test(subjectLine)) {
+          errors.push(`Message suggests multiple responsibilities. Split into separate commits.`);
+        }
+
+        // If there are blocking errors, return them without committing
+        if (errors.length > 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `## Commit Blocked\n\n**Errors:**\n${errors.map((e) => `- ${e}`).join('\n')}\n${warnings.length > 0 ? `\n**Warnings:**\n${warnings.map((w) => `- ${w}`).join('\n')}` : ''}\n${COMMIT_RULES}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Stage files if provided
+        if (files.length > 0) {
+          try {
+            const fileArgs = files.map((f) => `"${f}"`).join(' ');
+            await execAsync(`git add ${fileArgs}`, { cwd: PROJECT_PATH });
+          } catch (e) {
+            throw new Error(`Failed to stage files: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+
+        // Check if there are staged changes
+        try {
+          const { stdout } = await execAsync('git diff --cached --name-only', {
+            cwd: PROJECT_PATH,
+          });
+          if (!stdout.trim()) {
+            throw new Error(
+              'No staged changes to commit. Stage files first or pass files parameter.'
+            );
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.includes('No staged changes')) {
+            throw e;
+          }
+          throw new Error(
+            `Failed to check staged changes: ${e instanceof Error ? e.message : String(e)}`
+          );
+        }
+
+        // Build commit message with Co-Authored-By
+        const fullMessage = `${message}\n\nCo-Authored-By: Claude <noreply@anthropic.com>`;
+
+        // Execute commit
+        try {
+          const { stdout } = await execAsync(
+            `git commit -m "${fullMessage.replace(/"/g, '\\"')}"`,
+            { cwd: PROJECT_PATH }
+          );
+
+          let response = `## Commit Successful\n\n${stdout.trim()}`;
+          if (warnings.length > 0) {
+            response += `\n\n**Warnings:**\n${warnings.map((w) => `- ${w}`).join('\n')}`;
+          }
+          response += `\n${COMMIT_RULES}`;
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: response,
+              },
+            ],
+          };
+        } catch (e) {
+          throw new Error(`Git commit failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
       }
 
       default:
