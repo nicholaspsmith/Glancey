@@ -96,6 +96,39 @@ const TOOL_GUIDANCE = `
 **Tip:** Prefer lance-context's \`search_code\` over pattern-based tools (grep, find_symbol) when exploring code or unsure of exact names.`;
 
 /**
+ * Server instructions provided at MCP initialization.
+ * These guide Claude on when to use lance-context tools vs alternatives.
+ */
+const SERVER_INSTRUCTIONS = `# lance-context - Semantic Code Search
+
+## When to Use lance-context Tools
+
+**PREFER lance-context tools** over pattern-based alternatives (grep, find, Serena) for code exploration:
+
+| Task | Use lance-context | Instead of |
+|------|-------------------|------------|
+| Find code by concept | \`search_code\` | grep with regex |
+| Unsure of exact names | \`search_code\` | wildcards, substring matching |
+| Explore unfamiliar code | \`search_code\` | multiple grep/find attempts |
+| Find similar patterns | \`search_similar\` | manual comparison |
+| Commit changes | \`commit\` | git commit |
+
+## Tool Overview
+
+- **search_code**: Natural language code search. One call replaces multiple pattern searches.
+- **search_similar**: Find duplicate/related code patterns.
+- **commit**: Git commit with validation (feature branch check, message format, single responsibility).
+- **index_codebase**: Build/update the search index.
+- **get_index_status**: Check if index is ready.
+
+## Signs You Should Have Used search_code
+
+- You used wildcards or regex alternation
+- Multiple search attempts to find something
+- Pattern-based search returned nothing
+- Searching for a concept, not an exact identifier`;
+
+/**
  * Priority instructions returned by get_project_instructions
  */
 const PRIORITY_INSTRUCTIONS = `
@@ -165,6 +198,7 @@ const server = new Server(
     capabilities: {
       tools: {},
     },
+    instructions: SERVER_INSTRUCTIONS,
   }
 );
 
