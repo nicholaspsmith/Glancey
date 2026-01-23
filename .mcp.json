@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "lance-context": {
+      "command": "node",
+      "args": ["dist/index.js"],
+      "env": {
+        "LANCE_CONTEXT_PROJECT": "."
+      }
+    }
+  }
+}
