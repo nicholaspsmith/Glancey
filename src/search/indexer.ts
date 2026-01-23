@@ -285,6 +285,7 @@ export class CodeIndexer {
         chunkCount: 0,
         lastUpdated: null,
         indexPath: this.indexPath,
+        embeddingBackend: this.embeddingBackend.name,
       };
     }
 
@@ -300,7 +301,7 @@ export class CodeIndexer {
       chunkCount: count,
       lastUpdated: metadata?.lastUpdated ?? null,
       indexPath: this.indexPath,
-      embeddingBackend: metadata?.embeddingBackend,
+      embeddingBackend: metadata?.embeddingBackend ?? this.embeddingBackend.name,
     };
   }
 
