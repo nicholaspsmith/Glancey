@@ -113,6 +113,285 @@ const CONFIG_FILENAMES = ['.lance-context.json', 'lance-context.config.json'];
 /**
  * Load and validate configuration from project directory
  */
+
+/**
+ * Format a Zod validation error into a user-friendly message
+ */
+function formatValidationError(error: z.core.$ZodIssue, rawConfig: unknown): string {
+  const pathArray = error.path.map((p) => String(p));
+  const fieldPath = pathArray.join('.');
+  const rawValue = getValueAtPath(rawConfig, pathArray);
+  const rawValueStr = rawValue === undefined ? 'undefined' : JSON.stringify(rawValue);
+
+  switch (error.code) {
+    case 'invalid_type': {
+      const expected = (error as z.core.$ZodIssueInvalidType).expected;
+      const suggestion = getSuggestionForType(fieldPath, String(expected), rawValue);
+      return `  - ${fieldPath}: Expected ${expected}, got ${typeof rawValue} ${rawValueStr}${suggestion}`;
+    }
+    case 'too_small': {
+      const issueMin = error as z.core.$ZodIssueTooSmall;
+      const suggestion = getSuggestionForRange(fieldPath, 'minimum', issueMin.minimum as number);
+      return `  - ${fieldPath}: Value ${rawValueStr} is below minimum ${issueMin.minimum}${suggestion}`;
+    }
+    case 'too_big': {
+      const issueMax = error as z.core.$ZodIssueTooBig;
+      const suggestion = getSuggestionForRange(fieldPath, 'maximum', issueMax.maximum as number);
+      return `  - ${fieldPath}: Value ${rawValueStr} exceeds maximum ${issueMax.maximum}${suggestion}`;
+    }
+    case 'invalid_value': {
+      // Handle enum validation errors
+      const issueVal = error as z.core.$ZodIssueInvalidValue;
+      if (issueVal.values) {
+        const options = issueVal.values.map((o) => `'${String(o)}'`).join(', ');
+        return `  - ${fieldPath}: Invalid value ${rawValueStr}. Valid options: ${options}`;
+      }
+      return `  - ${fieldPath}: Invalid value ${rawValueStr}`;
+    }
+    default:
+      return `  - ${fieldPath}: ${error.message}`;
+  }
+}
+
+/**
+ * Get the value at a path in an object
+ */
+function getValueAtPath(obj: unknown, pathSegments: string[]): unknown {
+  let current: unknown = obj;
+  for (const segment of pathSegments) {
+    if (current === null || typeof current !== 'object') {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[segment];
+  }
+  return current;
+}
+
+/**
+ * Get suggestions for common type mistakes
+ */
+function getSuggestionForType(fieldPath: string, expected: string, rawValue: unknown): string {
+  // Check for string that looks like a number
+  if (expected === 'number' && typeof rawValue === 'string') {
+    const num = Number(rawValue);
+    if (!isNaN(num)) {
+      return `\n    Suggestion: Remove quotes to use numeric value: ${num}`;
+    }
+  }
+
+  // Check for string that looks like a boolean
+  if (expected === 'boolean' && typeof rawValue === 'string') {
+    const lower = rawValue.toLowerCase();
+    if (lower === 'true' || lower === 'false') {
+      return `\n    Suggestion: Remove quotes to use boolean value: ${lower}`;
+    }
+  }
+
+  // Check for array expected but got single value
+  if (expected === 'array' && typeof rawValue === 'string') {
+    return `\n    Suggestion: Wrap the value in an array: ["${rawValue}"]`;
+  }
+
+  return '';
+}
+
+/**
+ * Get suggestions for range violations
+ */
+function getSuggestionForRange(
+  fieldPath: string,
+  boundType: 'minimum' | 'maximum',
+  _bound: number
+): string {
+  const fieldSuggestions: Record<string, string> = {
+    'chunking.maxLines':
+      boundType === 'minimum'
+        ? '\n    Suggestion: Use a value between 10 and 500 lines per chunk'
+        : '\n    Suggestion: Use a value between 10 and 500 lines per chunk',
+    'chunking.overlap':
+      boundType === 'minimum'
+        ? '\n    Suggestion: Use a value between 0 and 50 lines for overlap'
+        : '\n    Suggestion: Use a value between 0 and 50 lines for overlap',
+    'search.semanticWeight': '\n    Suggestion: Use a value between 0.0 and 1.0 for search weights',
+    'search.keywordWeight': '\n    Suggestion: Use a value between 0.0 and 1.0 for search weights',
+    'dashboard.port': '\n    Suggestion: Use a port number between 1024 and 65535',
+  };
+
+  return fieldSuggestions[fieldPath] || '';
+}
+
+/**
+ * Print formatted validation warnings to console
+ */
+function printValidationWarnings(filename: string, errors: z.ZodIssue[], rawConfig: unknown): void {
+  console.warn(`[lance-context] Warning: Invalid config in ${filename}`);
+  for (const error of errors) {
+    console.warn(formatValidationError(error, rawConfig));
+  }
+  console.warn('  Using default values for invalid fields.');
+}
+
+/**
+ * Extract valid configuration values from a raw config object.
+ * This allows us to use valid fields while falling back to defaults for invalid ones.
+ */
+function extractValidConfig(rawConfig: unknown): Partial<z.infer<typeof ConfigSchema>> {
+  if (typeof rawConfig !== 'object' || rawConfig === null) {
+    return {};
+  }
+
+  const config = rawConfig as Record<string, unknown>;
+  const result: Partial<z.infer<typeof ConfigSchema>> = {};
+
+  // Try to parse each section independently
+  if (config.patterns !== undefined) {
+    const patternsResult = z.array(z.string()).safeParse(config.patterns);
+    if (patternsResult.success) {
+      result.patterns = patternsResult.data;
+    }
+  }
+
+  if (config.excludePatterns !== undefined) {
+    const excludeResult = z.array(z.string()).safeParse(config.excludePatterns);
+    if (excludeResult.success) {
+      result.excludePatterns = excludeResult.data;
+    }
+  }
+
+  if (config.instructions !== undefined) {
+    const instructionsResult = z.string().safeParse(config.instructions);
+    if (instructionsResult.success) {
+      result.instructions = instructionsResult.data;
+    }
+  }
+
+  if (config.embedding !== undefined) {
+    const embeddingResult = EmbeddingConfigSchema.safeParse(config.embedding);
+    if (embeddingResult.success) {
+      result.embedding = embeddingResult.data;
+    }
+  }
+
+  if (config.chunking !== undefined) {
+    // Try to extract valid individual fields from chunking
+    const chunkingResult = extractValidChunking(config.chunking);
+    if (Object.keys(chunkingResult).length > 0) {
+      result.chunking = chunkingResult;
+    }
+  }
+
+  if (config.search !== undefined) {
+    // Try to extract valid individual fields from search
+    const searchResult = extractValidSearch(config.search);
+    if (Object.keys(searchResult).length > 0) {
+      result.search = searchResult;
+    }
+  }
+
+  if (config.dashboard !== undefined) {
+    // Try to extract valid individual fields from dashboard
+    const dashboardResult = extractValidDashboard(config.dashboard);
+    if (Object.keys(dashboardResult).length > 0) {
+      result.dashboard = dashboardResult;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Extract valid chunking config fields
+ */
+function extractValidChunking(rawChunking: unknown): Partial<z.infer<typeof ChunkingConfigSchema>> {
+  if (typeof rawChunking !== 'object' || rawChunking === null) {
+    return {};
+  }
+
+  const chunking = rawChunking as Record<string, unknown>;
+  const result: Partial<z.infer<typeof ChunkingConfigSchema>> = {};
+
+  if (chunking.maxLines !== undefined) {
+    const maxLinesResult = z.number().min(10).max(500).safeParse(chunking.maxLines);
+    if (maxLinesResult.success) {
+      result.maxLines = maxLinesResult.data;
+    }
+  }
+
+  if (chunking.overlap !== undefined) {
+    const overlapResult = z.number().min(0).max(50).safeParse(chunking.overlap);
+    if (overlapResult.success) {
+      result.overlap = overlapResult.data;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Extract valid search config fields
+ */
+function extractValidSearch(rawSearch: unknown): Partial<z.infer<typeof SearchConfigSchema>> {
+  if (typeof rawSearch !== 'object' || rawSearch === null) {
+    return {};
+  }
+
+  const search = rawSearch as Record<string, unknown>;
+  const result: Partial<z.infer<typeof SearchConfigSchema>> = {};
+
+  if (search.semanticWeight !== undefined) {
+    const semanticResult = z.number().min(0).max(1).safeParse(search.semanticWeight);
+    if (semanticResult.success) {
+      result.semanticWeight = semanticResult.data;
+    }
+  }
+
+  if (search.keywordWeight !== undefined) {
+    const keywordResult = z.number().min(0).max(1).safeParse(search.keywordWeight);
+    if (keywordResult.success) {
+      result.keywordWeight = keywordResult.data;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Extract valid dashboard config fields
+ */
+function extractValidDashboard(
+  rawDashboard: unknown
+): Partial<z.infer<typeof DashboardConfigSchema>> {
+  if (typeof rawDashboard !== 'object' || rawDashboard === null) {
+    return {};
+  }
+
+  const dashboard = rawDashboard as Record<string, unknown>;
+  const result: Partial<z.infer<typeof DashboardConfigSchema>> = {};
+
+  if (dashboard.enabled !== undefined) {
+    const enabledResult = z.boolean().safeParse(dashboard.enabled);
+    if (enabledResult.success) {
+      result.enabled = enabledResult.data;
+    }
+  }
+
+  if (dashboard.port !== undefined) {
+    const portResult = z.number().min(1024).max(65535).safeParse(dashboard.port);
+    if (portResult.success) {
+      result.port = portResult.data;
+    }
+  }
+
+  if (dashboard.openBrowser !== undefined) {
+    const openBrowserResult = z.boolean().safeParse(dashboard.openBrowser);
+    if (openBrowserResult.success) {
+      result.openBrowser = openBrowserResult.data;
+    }
+  }
+
+  return result;
+}
+
 export async function loadConfig(projectPath: string): Promise<LanceContextConfig> {
   for (const filename of CONFIG_FILENAMES) {
     const configPath = path.join(projectPath, filename);
@@ -123,8 +402,30 @@ export async function loadConfig(projectPath: string): Promise<LanceContextConfi
       // Validate with Zod
       const result = ConfigSchema.safeParse(rawConfig);
       if (!result.success) {
-        console.error(`[lance-context] Invalid config in ${filename}: ${result.error.message}`);
-        continue;
+        // Print detailed validation warnings
+        printValidationWarnings(filename, result.error.issues, rawConfig);
+
+        // Try to salvage valid parts of the config by validating each section separately
+        const validConfig = extractValidConfig(rawConfig);
+
+        return {
+          patterns: validConfig.patterns || DEFAULT_PATTERNS,
+          excludePatterns: validConfig.excludePatterns || DEFAULT_EXCLUDE_PATTERNS,
+          embedding: validConfig.embedding,
+          chunking: {
+            ...DEFAULT_CHUNKING,
+            ...validConfig.chunking,
+          },
+          search: {
+            ...DEFAULT_SEARCH,
+            ...validConfig.search,
+          },
+          dashboard: {
+            ...DEFAULT_DASHBOARD,
+            ...validConfig.dashboard,
+          },
+          instructions: validConfig.instructions,
+        };
       }
 
       const userConfig = result.data;
@@ -147,8 +448,17 @@ export async function loadConfig(projectPath: string): Promise<LanceContextConfi
         },
         instructions: userConfig.instructions,
       };
-    } catch {
-      // Config file doesn't exist or is invalid JSON, continue to next
+    } catch (error) {
+      // Check if it's a JSON parse error
+      if (error instanceof SyntaxError) {
+        console.warn(`[lance-context] Warning: Invalid JSON in ${filename}`);
+        console.warn(`  - ${error.message}`);
+        console.warn(
+          '  Suggestion: Check for trailing commas, missing quotes, or other JSON syntax errors.'
+        );
+        continue;
+      }
+      // Config file doesn't exist, continue to next
     }
   }
 
