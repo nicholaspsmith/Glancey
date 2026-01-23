@@ -61,6 +61,28 @@ export interface EmbeddingConfig {
 
   /** Rate limiting: maximum burst capacity (default: 10) */
   rateLimitBurst?: number;
+
+  /**
+   * Maximum number of texts to process in a single batch request.
+   * Large batches are automatically split into smaller chunks to prevent
+   * timeouts, memory issues, and API rate limit errors.
+   * Default: 100 for Jina, 10 for Ollama (parallel requests)
+   */
+  batchSize?: number;
+}
+
+/**
+ * Split an array into chunks of specified size.
+ * @param array - The array to chunk
+ * @param size - Maximum size of each chunk
+ * @returns Array of chunks
+ */
+export function chunkArray<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
 }
 
 /**

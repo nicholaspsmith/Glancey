@@ -3,6 +3,7 @@ import { OllamaBackend } from './ollama.js';
 import { JinaBackend } from './jina.js';
 
 export * from './types.js';
+export { chunkArray } from './types.js';
 export { OllamaBackend } from './ollama.js';
 export { JinaBackend } from './jina.js';
 export { RateLimiter, type RateLimiterConfig } from './rate-limiter.js';

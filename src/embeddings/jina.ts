@@ -1,6 +1,10 @@
 import type { EmbeddingBackend, EmbeddingConfig } from './types.js';
+import { chunkArray } from './types.js';
 import { fetchWithRetry } from './retry.js';
 import { RateLimiter } from './rate-limiter.js';
+
+/** Default batch size for Jina API requests */
+const DEFAULT_BATCH_SIZE = 100;
 
 /**
  * Jina AI embedding backend
@@ -14,6 +18,7 @@ export class JinaBackend implements EmbeddingBackend {
   private baseUrl = 'https://api.jina.ai/v1/embeddings';
   private dimensions = 1024; // jina-embeddings-v3 default
   private rateLimiter: RateLimiter;
+  private batchSize: number;
 
   constructor(config: EmbeddingConfig) {
     this.model = config.model || 'jina-embeddings-v3';
@@ -21,6 +26,7 @@ export class JinaBackend implements EmbeddingBackend {
       throw new Error('Jina API key is required. Set JINA_API_KEY environment variable.');
     }
     this.apiKey = config.apiKey;
+    this.batchSize = config.batchSize ?? DEFAULT_BATCH_SIZE;
 
     // Initialize rate limiter with configurable or default values
     this.rateLimiter = new RateLimiter({
@@ -64,6 +70,28 @@ export class JinaBackend implements EmbeddingBackend {
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
+    // For small batches, process directly
+    if (texts.length <= this.batchSize) {
+      return this.embedBatchDirect(texts);
+    }
+
+    // For large batches, chunk and process sequentially
+    const chunks = chunkArray(texts, this.batchSize);
+    const results: number[][] = [];
+
+    for (const chunk of chunks) {
+      const chunkResults = await this.embedBatchDirect(chunk);
+      results.push(...chunkResults);
+    }
+
+    return results;
+  }
+
+  /**
+   * Embed a batch of texts in a single API request (no chunking).
+   * Used internally by embedBatch.
+   */
+  private async embedBatchDirect(texts: string[]): Promise<number[][]> {
     // Acquire a rate limit token before making the request
     // Note: batch requests count as one API call
     await this.rateLimiter.acquire();
