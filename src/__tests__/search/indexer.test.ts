@@ -246,13 +246,43 @@ describe('CodeIndexer', () => {
 
       const results = await indexer.search('hello');
 
-      expect(results[0]).toEqual({
+      expect(results[0]).toMatchObject({
         id: 'test.ts:1-10',
         filepath: 'test.ts',
         content: 'function hello() {}',
         startLine: 1,
         endLine: 10,
         language: 'typescript',
+      });
+    });
+
+    it('should include symbol context when available', async () => {
+      const mockTable = createMockTable([
+        {
+          id: 'test.ts:1-10:hello',
+          filepath: 'test.ts',
+          content: 'function hello() {}',
+          startLine: 1,
+          endLine: 10,
+          language: 'typescript',
+          symbolType: 'function',
+          symbolName: 'hello',
+        },
+      ]);
+      mockConnection.tableNames.mockResolvedValue(['code_chunks']);
+      mockConnection.openTable.mockResolvedValue(mockTable as any);
+      vi.mocked(fsPromises.readFile).mockRejectedValue(new Error('ENOENT'));
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      const results = await indexer.search('hello');
+
+      expect(results[0]).toMatchObject({
+        id: 'test.ts:1-10:hello',
+        filepath: 'test.ts',
+        symbolType: 'function',
+        symbolName: 'hello',
       });
     });
   });

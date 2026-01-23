@@ -420,10 +420,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           languages: isStringArray(args?.languages) ? args.languages : undefined,
         });
         const formatted = results
-          .map(
-            (r, i) =>
-              `## Result ${i + 1}: ${r.filepath}:${r.startLine}-${r.endLine}\n\`\`\`${r.language}\n${r.content}\n\`\`\``
-          )
+          .map((r, i) => {
+            // Build header with optional symbol context
+            let header = `## Result ${i + 1}: ${r.filepath}:${r.startLine}-${r.endLine}`;
+            if (r.symbolName) {
+              const typeLabel = r.symbolType ? ` (${r.symbolType})` : '';
+              header += `\n**Symbol:** \`${r.symbolName}\`${typeLabel}`;
+            }
+            return `${header}\n\`\`\`${r.language}\n${r.content}\n\`\`\``;
+          })
           .join('\n\n');
         return {
           content: [
@@ -498,10 +503,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         const formatted = results
-          .map(
-            (r, i) =>
-              `## Similar ${i + 1}: ${r.filepath}:${r.startLine}-${r.endLine} (${(r.similarity * 100).toFixed(1)}% similar)\n\`\`\`${r.language}\n${r.content}\n\`\`\``
-          )
+          .map((r, i) => {
+            let header = `## Similar ${i + 1}: ${r.filepath}:${r.startLine}-${r.endLine} (${(r.similarity * 100).toFixed(1)}% similar)`;
+            if (r.symbolName) {
+              const typeLabel = r.symbolType ? ` (${r.symbolType})` : '';
+              header += `\n**Symbol:** \`${r.symbolName}\`${typeLabel}`;
+            }
+            return `${header}\n\`\`\`${r.language}\n${r.content}\n\`\`\``;
+          })
           .join('\n\n');
 
         return {
