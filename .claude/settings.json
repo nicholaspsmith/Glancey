@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git commit*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'IMPORTANT: Before committing, ensure you have read and followed the rules in .claude/rules.md - each commit must have exactly one responsibility and the body must only contain the Co-Authored-By line.'"
+          }
+        ]
+      }
+    ]
+  }
+}
