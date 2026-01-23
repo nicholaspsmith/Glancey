@@ -14,6 +14,14 @@ import {
 } from '../config.js';
 import { minimatch } from 'minimatch';
 import { mapInBatches } from '../utils/concurrency.js';
+import {
+  kMeansClustering,
+  calculateSilhouetteScore,
+  type ConceptCluster,
+  type ClusteringResult,
+  type ClusteringOptions,
+  type ChunkForClustering,
+} from './clustering.js';
 
 /** Default concurrency for parallel file processing */
 const FILE_PROCESSING_CONCURRENCY = 10;
@@ -155,6 +163,24 @@ export interface IndexProgress {
  * Callback function for receiving indexing progress updates.
  */
 export type ProgressCallback = (progress: IndexProgress) => void;
+
+/**
+ * Summary of the codebase structure and concept areas
+ */
+export interface CodebaseSummary {
+  /** Total number of files indexed */
+  totalFiles: number;
+  /** Total number of code chunks */
+  totalChunks: number;
+  /** Languages detected in the codebase */
+  languages: { language: string; fileCount: number; chunkCount: number }[];
+  /** Discovered concept clusters */
+  concepts: ConceptCluster[];
+  /** Quality score for the clustering (silhouette score, -1 to 1) */
+  clusteringQuality: number;
+  /** Timestamp when summary was generated */
+  generatedAt: string;
+}
 
 /**
  * Sanitize a file path for use in LanceDB filter expressions.
@@ -1090,5 +1116,251 @@ export class CodeIndexer {
     this.table = null;
     // Clear query embedding cache to prevent stale embeddings
     this.queryEmbeddingCache.clear();
+    // Clear clustering metadata
+    await this.clearClusteringMetadata();
+  }
+
+  private get clusteringMetadataPath(): string {
+    return path.join(this.indexPath, 'clustering-metadata.json');
+  }
+
+  /**
+   * Clear clustering metadata file
+   */
+  private async clearClusteringMetadata(): Promise<void> {
+    try {
+      await fs.unlink(this.clusteringMetadataPath);
+    } catch {
+      // Ignore errors if file doesn't exist
+    }
+  }
+
+  /**
+   * Save clustering result to metadata file
+   */
+  private async saveClusteringMetadata(result: ClusteringResult): Promise<void> {
+    await fs.mkdir(this.indexPath, { recursive: true });
+    const data = {
+      clusterCount: result.clusterCount,
+      clusters: result.clusters,
+      // Convert Map to object for JSON serialization
+      assignments: Object.fromEntries(result.assignments),
+      generatedAt: new Date().toISOString(),
+    };
+    await fs.writeFile(this.clusteringMetadataPath, JSON.stringify(data, null, 2));
+  }
+
+  /**
+   * Load clustering result from metadata file
+   */
+  private async loadClusteringMetadata(): Promise<ClusteringResult | null> {
+    try {
+      const content = await fs.readFile(this.clusteringMetadataPath, 'utf-8');
+      const data = JSON.parse(content);
+      return {
+        clusterCount: data.clusterCount,
+        clusters: data.clusters,
+        // Convert object back to Map
+        assignments: new Map(Object.entries(data.assignments).map(([k, v]) => [k, v as number])),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Cluster the indexed codebase into semantic concept areas.
+   * Uses k-means clustering on embeddings to discover related code groups.
+   */
+  async clusterConcepts(options: ClusteringOptions = {}): Promise<ClusteringResult> {
+    if (!this.table) {
+      const status = await this.getStatus();
+      if (!status.indexed) {
+        throw new Error('Codebase not indexed. Run index_codebase first.');
+      }
+      this.table = await this.db!.openTable('code_chunks');
+    }
+
+    // Fetch all chunks with embeddings
+    const rows = await this.table.query().toArray();
+
+    const chunks: ChunkForClustering[] = rows.map((row) => ({
+      id: row.id,
+      content: row.content,
+      filepath: row.filepath,
+      embedding: row.vector,
+      symbolName: row.symbolName,
+      symbolType: row.symbolType,
+    }));
+
+    // Perform clustering
+    const result = kMeansClustering(chunks, options);
+
+    // Save to metadata file
+    await this.saveClusteringMetadata(result);
+
+    return result;
+  }
+
+  /**
+   * List all discovered concept clusters.
+   * Returns cached clustering result if available, otherwise clusters first.
+   */
+  async listConcepts(forceRecluster: boolean = false): Promise<ConceptCluster[]> {
+    if (!forceRecluster) {
+      const cached = await this.loadClusteringMetadata();
+      if (cached) {
+        return cached.clusters;
+      }
+    }
+
+    const result = await this.clusterConcepts();
+    return result.clusters;
+  }
+
+  /**
+   * Search for code within a specific concept cluster.
+   * Returns chunks that belong to the specified cluster, optionally filtered by query.
+   */
+  async searchByConcept(
+    conceptId: number,
+    query?: string,
+    limit: number = 10
+  ): Promise<CodeChunk[]> {
+    const clustering = await this.loadClusteringMetadata();
+    if (!clustering) {
+      throw new Error('No clustering data available. Run clusterConcepts first.');
+    }
+
+    // Get chunk IDs in this cluster
+    const chunkIds = new Set<string>();
+    for (const [chunkId, clusterId] of clustering.assignments) {
+      if (clusterId === conceptId) {
+        chunkIds.add(chunkId);
+      }
+    }
+
+    if (chunkIds.size === 0) {
+      return [];
+    }
+
+    if (!this.table) {
+      this.table = await this.db!.openTable('code_chunks');
+    }
+
+    // If query provided, use semantic search and filter to cluster
+    if (query) {
+      const queryEmbedding = await this.getQueryEmbedding(query);
+      const results = await this.table
+        .search(queryEmbedding)
+        .limit(limit * 3)
+        .toArray();
+
+      return results
+        .filter((r) => chunkIds.has(r.id))
+        .slice(0, limit)
+        .map((r) => ({
+          id: r.id,
+          filepath: r.filepath,
+          content: r.content,
+          startLine: r.startLine,
+          endLine: r.endLine,
+          language: r.language,
+          symbolType: r.symbolType,
+          symbolName: r.symbolName,
+        }));
+    }
+
+    // Without query, return representative chunks from the cluster
+    const cluster = clustering.clusters.find((c) => c.id === conceptId);
+    if (!cluster) {
+      return [];
+    }
+
+    const results: CodeChunk[] = [];
+    for (const chunkId of cluster.representativeChunks.slice(0, limit)) {
+      // Fetch chunk by ID - LanceDB doesn't have direct ID lookup, so we filter
+      const rows = await this.table.query().where(`id = '${chunkId}'`).limit(1).toArray();
+      if (rows.length > 0) {
+        const r = rows[0];
+        results.push({
+          id: r.id,
+          filepath: r.filepath,
+          content: r.content,
+          startLine: r.startLine,
+          endLine: r.endLine,
+          language: r.language,
+          symbolType: r.symbolType,
+          symbolName: r.symbolName,
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Generate a comprehensive summary of the codebase including concept areas.
+   */
+  async summarizeCodebase(clusteringOptions?: ClusteringOptions): Promise<CodebaseSummary> {
+    const status = await this.getStatus();
+    if (!status.indexed) {
+      throw new Error('Codebase not indexed. Run index_codebase first.');
+    }
+
+    if (!this.table) {
+      this.table = await this.db!.openTable('code_chunks');
+    }
+
+    // Gather language statistics
+    const rows = await this.table.query().toArray();
+    const languageStats = new Map<string, { fileCount: Set<string>; chunkCount: number }>();
+
+    for (const row of rows) {
+      const lang = row.language;
+      if (!languageStats.has(lang)) {
+        languageStats.set(lang, { fileCount: new Set(), chunkCount: 0 });
+      }
+      const stats = languageStats.get(lang)!;
+      stats.fileCount.add(row.filepath);
+      stats.chunkCount++;
+    }
+
+    const languages = Array.from(languageStats.entries())
+      .map(([language, stats]) => ({
+        language,
+        fileCount: stats.fileCount.size,
+        chunkCount: stats.chunkCount,
+      }))
+      .sort((a, b) => b.chunkCount - a.chunkCount);
+
+    // Perform clustering
+    const chunks: ChunkForClustering[] = rows.map((row) => ({
+      id: row.id,
+      content: row.content,
+      filepath: row.filepath,
+      embedding: row.vector,
+      symbolName: row.symbolName,
+      symbolType: row.symbolType,
+    }));
+
+    const clusteringResult = kMeansClustering(chunks, clusteringOptions);
+    await this.saveClusteringMetadata(clusteringResult);
+
+    // Calculate clustering quality
+    const silhouetteScore = calculateSilhouetteScore(
+      chunks,
+      clusteringResult.assignments,
+      clusteringResult.clusters
+    );
+
+    return {
+      totalFiles: status.fileCount,
+      totalChunks: status.chunkCount,
+      languages,
+      concepts: clusteringResult.clusters,
+      clusteringQuality: silhouetteScore,
+      generatedAt: new Date().toISOString(),
+    };
   }
 }
