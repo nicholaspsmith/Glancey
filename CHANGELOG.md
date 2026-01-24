@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/nicholaspsmith/lance-context/compare/v1.2.0...v1.2.1) (2026-01-24)
+
+
+### Bug Fixes
+
+* remove duplicate labels from usage chart ([d865476](https://github.com/nicholaspsmith/lance-context/commit/d8654762ab22444b76333fe02c61da072af172fc))
+
 # [1.2.0](https://github.com/nicholaspsmith/lance-context/compare/v1.1.0...v1.2.0) (2026-01-24)
 
 
