@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/nicholaspsmith/lance-context/compare/v1.1.0...v1.2.0) (2026-01-24)
+
+
+### Features
+
+* add checkpoint-based indexing for crash recovery ([#45](https://github.com/nicholaspsmith/lance-context/issues/45)) ([e95f0d5](https://github.com/nicholaspsmith/lance-context/commit/e95f0d566e7dda01459055f5edee71120d6ffd85))
+
 # [1.1.0](https://github.com/nicholaspsmith/lance-context/compare/v1.0.1...v1.1.0) (2026-01-24)
 
 
