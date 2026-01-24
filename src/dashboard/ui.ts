@@ -882,7 +882,7 @@ export function getDashboardHTML(): string {
         <div id="usageChartContainer">
           <div class="usage-empty" id="usageEmpty">No commands executed yet</div>
           <div id="chartWrapper">
-            <table class="charts-css column show-labels show-primary-axis show-data data-spacing-20" id="usage-chart" style="display: none;">
+            <table class="charts-css column show-primary-axis show-data data-spacing-20" id="usage-chart" style="display: none;">
               <tbody id="usageChartBody"></tbody>
             </table>
           </div>
