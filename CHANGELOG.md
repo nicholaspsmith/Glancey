@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/nicholaspsmith/lance-context/compare/v1.0.1...v1.1.0) (2026-01-24)
+
+
+### Features
+
+* **dashboard:** display package version in header ([#41](https://github.com/nicholaspsmith/lance-context/issues/41)) ([5015f81](https://github.com/nicholaspsmith/lance-context/commit/5015f81e8215e71c9f7ff9f4fcaf5ed1b50901a8))
+
 ## [1.0.1](https://github.com/nicholaspsmith/lance-context/compare/v1.0.0...v1.0.1) (2026-01-23)
 
 
