@@ -11,7 +11,10 @@ Key requirements:
 
 ## Command Preferences
 
-- Use `fd` instead of `find` for file searching
+**Use modern CLI tools when available:**
+- Use `fd` instead of `find` for file searching (faster, simpler syntax)
+- Use `rg` (ripgrep) instead of `grep` for content searching (faster, better defaults)
+- These tools are available on this system and should always be preferred
 
 ## Semantic Code Search
 
