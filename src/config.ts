@@ -13,6 +13,8 @@ const ChunkingConfigSchema = z.object({
 const SearchConfigSchema = z.object({
   semanticWeight: z.number().min(0).max(1).optional(),
   keywordWeight: z.number().min(0).max(1).optional(),
+  /** Automatically reindex when stale files are detected before search (default: true) */
+  autoReindex: z.boolean().optional(),
 });
 
 const EmbeddingConfigSchema = z.object({
@@ -98,6 +100,7 @@ export const DEFAULT_CHUNKING: Required<ChunkingConfig> = {
 export const DEFAULT_SEARCH: Required<SearchConfig> = {
   semanticWeight: 0.7,
   keywordWeight: 0.3,
+  autoReindex: true,
 };
 
 /**
@@ -375,6 +378,13 @@ function extractValidSearch(rawSearch: unknown): Partial<z.infer<typeof SearchCo
     const keywordResult = z.number().min(0).max(1).safeParse(search.keywordWeight);
     if (keywordResult.success) {
       result.keywordWeight = keywordResult.data;
+    }
+  }
+
+  if (search.autoReindex !== undefined) {
+    const autoReindexResult = z.boolean().safeParse(search.autoReindex);
+    if (autoReindexResult.success) {
+      result.autoReindex = autoReindexResult.data;
     }
   }
 
