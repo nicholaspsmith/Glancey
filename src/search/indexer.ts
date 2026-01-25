@@ -533,6 +533,84 @@ export class CodeIndexer {
   }
 
   /**
+   * Get all project files matching the configured patterns.
+   * Used for change detection and staleness checking.
+   */
+  private async getProjectFiles(): Promise<string[]> {
+    const { glob } = await import('glob');
+
+    // Ensure config is loaded
+    if (!this.config) {
+      this.config = await loadConfig(this.projectPath);
+    }
+
+    const patterns = this.config.patterns || getDefaultPatterns();
+    const excludePatterns = this.config.excludePatterns || getDefaultExcludePatterns();
+
+    const files: string[] = [];
+    for (const pattern of patterns) {
+      const matches = await glob(pattern, {
+        cwd: this.projectPath,
+        ignore: excludePatterns,
+        absolute: true,
+      });
+      files.push(...matches);
+    }
+
+    return files;
+  }
+
+  /**
+   * Check if the index is stale (files have been modified since last index).
+   * Returns true if any files have been added, modified, or deleted.
+   * This is a lightweight check that only compares file modification times.
+   */
+  async checkIfStale(): Promise<{ stale: boolean; reason?: string }> {
+    // Ensure database is initialized
+    if (!this.db) {
+      await this.initialize();
+    }
+
+    // Check if index exists
+    const tableNames = await this.db!.tableNames();
+    if (!tableNames.includes('code_chunks')) {
+      return { stale: true, reason: 'Index does not exist' };
+    }
+
+    // Check if metadata table exists
+    if (!tableNames.includes('file_metadata')) {
+      return { stale: true, reason: 'No file metadata stored' };
+    }
+
+    // Get current files
+    const currentFiles = await this.getProjectFiles();
+
+    // Detect changes
+    const changes = await this.detectFileChanges(currentFiles);
+
+    const hasChanges =
+      changes.added.length > 0 || changes.modified.length > 0 || changes.deleted.length > 0;
+
+    if (!hasChanges) {
+      return { stale: false };
+    }
+
+    // Build reason string
+    const reasons: string[] = [];
+    if (changes.added.length > 0) {
+      reasons.push(`${changes.added.length} new file(s)`);
+    }
+    if (changes.modified.length > 0) {
+      reasons.push(`${changes.modified.length} modified file(s)`);
+    }
+    if (changes.deleted.length > 0) {
+      reasons.push(`${changes.deleted.length} deleted file(s)`);
+    }
+
+    return { stale: true, reason: reasons.join(', ') };
+  }
+
+  /**
    * Save metadata for indexed files
    */
   private async saveFileMetadata(files: string[]): Promise<void> {
@@ -1464,8 +1542,17 @@ export class CodeIndexer {
       }
     }
 
-    const queryEmbedding = await this.getQueryEmbedding(query);
+    // Check for stale index and auto-reindex if configured
     const searchConfig = getSearchConfig(this.config!);
+    if (searchConfig.autoReindex) {
+      const staleCheck = await this.checkIfStale();
+      if (staleCheck.stale) {
+        // Perform incremental reindex (indexCodebase auto-detects changes)
+        await this.indexCodebase();
+      }
+    }
+
+    const queryEmbedding = await this.getQueryEmbedding(query);
 
     // Fetch more results than needed for re-ranking and filtering
     // If we have filters, fetch even more to account for filtered-out results
