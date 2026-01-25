@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/nicholaspsmith/lance-context/compare/v1.11.0...v1.12.0) (2026-01-25)
+
+
+### Features
+
+* extract MCP tool handlers into testable modules ([#66](https://github.com/nicholaspsmith/lance-context/issues/66)) ([0b2d59a](https://github.com/nicholaspsmith/lance-context/commit/0b2d59a77278c56a5cdb5e0578a1cb3b04484e98))
+
 # [1.11.0](https://github.com/nicholaspsmith/lance-context/compare/v1.10.1...v1.11.0) (2026-01-25)
 
 
