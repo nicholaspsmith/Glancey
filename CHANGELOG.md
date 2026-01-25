@@ -1,3 +1,11 @@
+## [1.4.1](https://github.com/nicholaspsmith/lance-context/compare/v1.4.0...v1.4.1) (2026-01-25)
+
+
+### Bug Fixes
+
+* add TTL expiration to query embedding cache ([#49](https://github.com/nicholaspsmith/lance-context/issues/49)) ([c74b3e3](https://github.com/nicholaspsmith/lance-context/commit/c74b3e345087f63067a29a0b734f8578e4ba20c1))
+* **security:** sanitize chunk IDs in clustering queries ([#48](https://github.com/nicholaspsmith/lance-context/issues/48)) ([b4a79ff](https://github.com/nicholaspsmith/lance-context/commit/b4a79ff37f922cf189acb10882c94a3b42d93eb0))
+
 # [1.4.0](https://github.com/nicholaspsmith/lance-context/compare/v1.3.0...v1.4.0) (2026-01-25)
 
 
