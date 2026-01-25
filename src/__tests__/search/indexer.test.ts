@@ -60,6 +60,7 @@ describe('CodeIndexer', () => {
     vi.mocked(configModule.getSearchConfig).mockReturnValue({
       semanticWeight: 0.7,
       keywordWeight: 0.3,
+      autoReindex: false, // Disable for tests to avoid reindexing during search
     });
     vi.mocked(configModule.getIndexingConfig).mockReturnValue({ batchSize: 32, batchDelayMs: 0 });
   });
@@ -1396,6 +1397,156 @@ describe('CodeIndexer', () => {
       const result = await indexer.indexCodebase();
       expect(result.filesIndexed).toBe(0);
       expect(result.chunksCreated).toBe(0);
+    });
+  });
+
+  describe('checkIfStale', () => {
+    it('should return stale=true when index does not exist', async () => {
+      mockConnection.tableNames.mockResolvedValue([]);
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      const result = await indexer.checkIfStale();
+
+      expect(result.stale).toBe(true);
+      expect(result.reason).toBe('Index does not exist');
+    });
+
+    it('should return stale=true when file_metadata table is missing', async () => {
+      mockConnection.tableNames.mockResolvedValue(['code_chunks']);
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      const result = await indexer.checkIfStale();
+
+      expect(result.stale).toBe(true);
+      expect(result.reason).toBe('No file metadata stored');
+    });
+
+    it('should return stale=false when no files have changed', async () => {
+      const { glob } = await import('glob');
+      const testFilePath = '/project/test.ts';
+      const storedMtime = 1000;
+
+      vi.mocked(glob as any).mockResolvedValue([testFilePath]);
+      vi.mocked(fsPromises.stat).mockResolvedValue({ mtimeMs: storedMtime } as any);
+
+      // Mock metadata table with matching mtime - needs query().toArray() chain
+      const mockMetadataTable = {
+        query: vi.fn().mockReturnValue({
+          toArray: vi.fn().mockResolvedValue([{ filepath: 'test.ts', mtime: storedMtime }]),
+        }),
+      };
+      mockConnection.tableNames.mockResolvedValue(['code_chunks', 'file_metadata']);
+      mockConnection.openTable.mockImplementation(async (tableName: string) => {
+        if (tableName === 'file_metadata') {
+          return mockMetadataTable as any;
+        }
+        return createMockTable([]) as any;
+      });
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      const result = await indexer.checkIfStale();
+
+      expect(result.stale).toBe(false);
+      expect(result.reason).toBeUndefined();
+    });
+
+    it('should return stale=true with reason when files are modified', async () => {
+      const { glob } = await import('glob');
+      const testFilePath = '/project/test.ts';
+      const storedMtime = 1000;
+      const newMtime = 2000; // Newer than stored
+
+      vi.mocked(glob as any).mockResolvedValue([testFilePath]);
+      vi.mocked(fsPromises.stat).mockResolvedValue({ mtimeMs: newMtime } as any);
+
+      // Mock metadata table with older mtime - needs query().toArray() chain
+      const mockMetadataTable = {
+        query: vi.fn().mockReturnValue({
+          toArray: vi.fn().mockResolvedValue([{ filepath: 'test.ts', mtime: storedMtime }]),
+        }),
+      };
+      mockConnection.tableNames.mockResolvedValue(['code_chunks', 'file_metadata']);
+      mockConnection.openTable.mockImplementation(async (tableName: string) => {
+        if (tableName === 'file_metadata') {
+          return mockMetadataTable as any;
+        }
+        return createMockTable([]) as any;
+      });
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      const result = await indexer.checkIfStale();
+
+      expect(result.stale).toBe(true);
+      expect(result.reason).toContain('modified');
+    });
+
+    it('should return stale=true with reason when new files are added', async () => {
+      const { glob } = await import('glob');
+
+      vi.mocked(glob as any).mockResolvedValue(['/project/existing.ts', '/project/new.ts']);
+      vi.mocked(fsPromises.stat).mockResolvedValue({ mtimeMs: 1000 } as any);
+
+      // Mock metadata table with only one file - needs query().toArray() chain
+      const mockMetadataTable = {
+        query: vi.fn().mockReturnValue({
+          toArray: vi.fn().mockResolvedValue([{ filepath: 'existing.ts', mtime: 1000 }]),
+        }),
+      };
+      mockConnection.tableNames.mockResolvedValue(['code_chunks', 'file_metadata']);
+      mockConnection.openTable.mockImplementation(async (tableName: string) => {
+        if (tableName === 'file_metadata') {
+          return mockMetadataTable as any;
+        }
+        return createMockTable([]) as any;
+      });
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      const result = await indexer.checkIfStale();
+
+      expect(result.stale).toBe(true);
+      expect(result.reason).toContain('new file');
+    });
+
+    it('should return stale=true with reason when files are deleted', async () => {
+      const { glob } = await import('glob');
+
+      vi.mocked(glob as any).mockResolvedValue(['/project/remaining.ts']);
+      vi.mocked(fsPromises.stat).mockResolvedValue({ mtimeMs: 1000 } as any);
+
+      // Mock metadata table with two files (one deleted) - needs query().toArray() chain
+      const mockMetadataTable = {
+        query: vi.fn().mockReturnValue({
+          toArray: vi.fn().mockResolvedValue([
+            { filepath: 'remaining.ts', mtime: 1000 },
+            { filepath: 'deleted.ts', mtime: 1000 },
+          ]),
+        }),
+      };
+      mockConnection.tableNames.mockResolvedValue(['code_chunks', 'file_metadata']);
+      mockConnection.openTable.mockImplementation(async (tableName: string) => {
+        if (tableName === 'file_metadata') {
+          return mockMetadataTable as any;
+        }
+        return createMockTable([]) as any;
+      });
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      const result = await indexer.checkIfStale();
+
+      expect(result.stale).toBe(true);
+      expect(result.reason).toContain('deleted');
     });
   });
 });
