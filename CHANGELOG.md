@@ -1,3 +1,10 @@
+## [1.4.2](https://github.com/nicholaspsmith/lance-context/compare/v1.4.1...v1.4.2) (2026-01-25)
+
+
+### Bug Fixes
+
+* use spawn for safer git command execution ([#50](https://github.com/nicholaspsmith/lance-context/issues/50)) ([ce06ccf](https://github.com/nicholaspsmith/lance-context/commit/ce06ccf3774eb85593227d2d630ae27639420c38))
+
 ## [1.4.1](https://github.com/nicholaspsmith/lance-context/compare/v1.4.0...v1.4.1) (2026-01-25)
 
 
