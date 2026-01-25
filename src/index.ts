@@ -3,12 +3,66 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
 
 const execAsync = promisify(exec);
+
+/**
+ * Execute a git command safely using spawn with array arguments.
+ * Avoids shell interpolation vulnerabilities.
+ * @param args Array of arguments to pass to git
+ * @param options Options including cwd and optional stdin
+ * @returns Promise with stdout and stderr
+ */
+function gitSpawn(
+  args: string[],
+  options: { cwd: string; stdin?: string }
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('git', args, {
+      cwd: options.cwd,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    proc.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on('error', (err) => {
+      reject(err);
+    });
+
+    proc.on('close', (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        const error = new Error(`git ${args[0]} failed with code ${code}: ${stderr}`);
+        (error as any).code = code;
+        (error as any).stdout = stdout;
+        (error as any).stderr = stderr;
+        reject(error);
+      }
+    });
+
+    // Write stdin if provided (for commit message)
+    if (options.stdin !== undefined) {
+      proc.stdin.write(options.stdin);
+      proc.stdin.end();
+    } else {
+      proc.stdin.end();
+    }
+  });
+}
 
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
@@ -1373,11 +1427,15 @@ ${conceptList}`;
           };
         }
 
-        // Stage files if provided
+        // Track files we staged for potential rollback
+        const stagedByUs: string[] = [];
+
+        // Stage files if provided (using spawn to avoid shell injection)
         if (files.length > 0) {
           try {
-            const fileArgs = files.map((f) => `"${f}"`).join(' ');
-            await execAsync(`git add ${fileArgs}`, { cwd: PROJECT_PATH });
+            // Use -- to prevent files starting with - being interpreted as options
+            await gitSpawn(['add', '--', ...files], { cwd: PROJECT_PATH });
+            stagedByUs.push(...files);
           } catch (e) {
             throw wrapError('Failed to stage files', 'git', e, { files });
           }
@@ -1385,7 +1443,7 @@ ${conceptList}`;
 
         // Check if there are staged changes
         try {
-          const { stdout } = await execAsync('git diff --cached --name-only', {
+          const { stdout } = await gitSpawn(['diff', '--cached', '--name-only'], {
             cwd: PROJECT_PATH,
           });
           if (!stdout.trim()) {
@@ -1412,12 +1470,12 @@ ${conceptList}`;
           // Ignore marker write failures - non-critical
         }
 
-        // Execute commit
+        // Execute commit using -F - to read message from stdin (avoids shell escaping issues)
         try {
-          const { stdout } = await execAsync(
-            `git commit -m "${fullMessage.replace(/"/g, '\\"')}"`,
-            { cwd: PROJECT_PATH }
-          );
+          const { stdout } = await gitSpawn(['commit', '-F', '-'], {
+            cwd: PROJECT_PATH,
+            stdin: fullMessage,
+          });
 
           let response = `## Commit Successful\n\n${stdout.trim()}`;
           if (warnings.length > 0) {
@@ -1434,6 +1492,14 @@ ${conceptList}`;
             ],
           };
         } catch (e) {
+          // Rollback: unstage files we staged if commit failed
+          if (stagedByUs.length > 0) {
+            try {
+              await gitSpawn(['reset', 'HEAD', '--', ...stagedByUs], { cwd: PROJECT_PATH });
+            } catch {
+              // Ignore rollback failures - best effort
+            }
+          }
           throw wrapError('Git commit failed', 'git', e, { message });
         }
       }
