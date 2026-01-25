@@ -1,3 +1,11 @@
+## [1.10.1](https://github.com/nicholaspsmith/lance-context/compare/v1.10.0...v1.10.1) (2026-01-25)
+
+
+### Bug Fixes
+
+* use Promise.allSettled in dashboard fetchData ([#62](https://github.com/nicholaspsmith/lance-context/issues/62)) ([91a8b34](https://github.com/nicholaspsmith/lance-context/commit/91a8b3445ff93ee5adc533b12090c573efd68890))
+* wrap SSE event listeners with try-catch ([#63](https://github.com/nicholaspsmith/lance-context/issues/63)) ([1bda6e7](https://github.com/nicholaspsmith/lance-context/commit/1bda6e7d0e83a88c2a7c04b9da300b7503164add))
+
 # [1.10.0](https://github.com/nicholaspsmith/lance-context/compare/v1.9.1...v1.10.0) (2026-01-25)
 
 
