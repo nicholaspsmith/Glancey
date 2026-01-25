@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/nicholaspsmith/lance-context/compare/v1.9.1...v1.10.0) (2026-01-25)
+
+
+### Features
+
+* add structured logging utility with log levels ([#60](https://github.com/nicholaspsmith/lance-context/issues/60)) ([b8f3f1e](https://github.com/nicholaspsmith/lance-context/commit/b8f3f1e5f4c0619c0ff97e61d3184cd359e203f6))
+
 ## [1.9.1](https://github.com/nicholaspsmith/lance-context/compare/v1.9.0...v1.9.1) (2026-01-25)
 
 
