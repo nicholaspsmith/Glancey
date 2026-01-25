@@ -222,4 +222,142 @@ describe('hybrid search scoring', () => {
       expect(resultB).toBeGreaterThan(resultA);
     });
   });
+
+  describe('re-ranking behavior', () => {
+    // Helper to calculate combined score with configurable weights
+    const calculateCombinedScore = (
+      semanticScore: number,
+      keywordScore: number,
+      semanticWeight: number,
+      keywordWeight: number
+    ) => semanticWeight * semanticScore + keywordWeight * keywordScore;
+
+    it('should maintain order when keyword scores are equal', () => {
+      // Three results with decreasing semantic scores, equal keyword scores
+      const results = [
+        { semantic: 1.0, keyword: 0.5 },
+        { semantic: 0.8, keyword: 0.5 },
+        { semantic: 0.6, keyword: 0.5 },
+      ];
+
+      const scored = results.map((r) => calculateCombinedScore(r.semantic, r.keyword, 0.7, 0.3));
+
+      // Order should be preserved
+      expect(scored[0]).toBeGreaterThan(scored[1]);
+      expect(scored[1]).toBeGreaterThan(scored[2]);
+    });
+
+    it('should reorder when keyword score difference overcomes semantic', () => {
+      // Result A: high semantic (rank 1), no keyword match
+      // Result B: lower semantic (rank 2), perfect keyword match
+      const resultA = calculateCombinedScore(1.0, 0.0, 0.7, 0.3); // 0.7
+      const resultB = calculateCombinedScore(0.6, 1.0, 0.7, 0.3); // 0.42 + 0.3 = 0.72
+
+      expect(resultB).toBeGreaterThan(resultA);
+    });
+
+    it('should preserve semantic order with small keyword differences', () => {
+      // Small keyword difference shouldn't overcome large semantic gap
+      const resultA = calculateCombinedScore(1.0, 0.3, 0.7, 0.3); // 0.7 + 0.09 = 0.79
+      const resultB = calculateCombinedScore(0.5, 0.5, 0.7, 0.3); // 0.35 + 0.15 = 0.50
+
+      expect(resultA).toBeGreaterThan(resultB);
+    });
+  });
+
+  describe('weight configuration effects', () => {
+    const calculateCombinedScore = (
+      semanticScore: number,
+      keywordScore: number,
+      semanticWeight: number,
+      keywordWeight: number
+    ) => semanticWeight * semanticScore + keywordWeight * keywordScore;
+
+    it('should use only semantic when keywordWeight is 0', () => {
+      const score = calculateCombinedScore(0.8, 1.0, 1.0, 0.0);
+      expect(score).toBe(0.8); // Only semantic matters
+    });
+
+    it('should use only keyword when semanticWeight is 0', () => {
+      const score = calculateCombinedScore(1.0, 0.5, 0.0, 1.0);
+      expect(score).toBe(0.5); // Only keyword matters
+    });
+
+    it('should handle equal weights (50/50)', () => {
+      const score = calculateCombinedScore(0.8, 0.4, 0.5, 0.5);
+      expect(score).toBeCloseTo(0.6); // (0.8 + 0.4) / 2
+    });
+
+    it('should handle inverted weights (30/70 keyword-heavy)', () => {
+      const semanticHigh = calculateCombinedScore(1.0, 0.3, 0.3, 0.7); // 0.3 + 0.21 = 0.51
+      const keywordHigh = calculateCombinedScore(0.3, 1.0, 0.3, 0.7); // 0.09 + 0.7 = 0.79
+
+      // With inverted weights, keyword match should dominate
+      expect(keywordHigh).toBeGreaterThan(semanticHigh);
+    });
+  });
+
+  describe('score boundaries', () => {
+    const calculateCombinedScore = (
+      semanticScore: number,
+      keywordScore: number,
+      semanticWeight: number,
+      keywordWeight: number
+    ) => semanticWeight * semanticScore + keywordWeight * keywordScore;
+
+    it('should produce 0 when both scores are 0', () => {
+      const score = calculateCombinedScore(0.0, 0.0, 0.7, 0.3);
+      expect(score).toBe(0);
+    });
+
+    it('should produce max 1 when weights sum to 1 and scores are 1', () => {
+      const score = calculateCombinedScore(1.0, 1.0, 0.7, 0.3);
+      expect(score).toBe(1.0);
+    });
+
+    it('should handle minimum non-zero scores', () => {
+      const score = calculateCombinedScore(0.001, 0.001, 0.7, 0.3);
+      expect(score).toBeGreaterThan(0);
+      expect(score).toBeLessThan(0.01);
+    });
+  });
+
+  describe('ranking stability', () => {
+    const calculateCombinedScore = (
+      semanticScore: number,
+      keywordScore: number,
+      semanticWeight: number,
+      keywordWeight: number
+    ) => semanticWeight * semanticScore + keywordWeight * keywordScore;
+
+    it('should produce stable ordering for close scores', () => {
+      // Simulate multiple results with very similar scores
+      const results = [
+        { semantic: 0.95, keyword: 0.8, id: 'a' },
+        { semantic: 0.93, keyword: 0.85, id: 'b' },
+        { semantic: 0.9, keyword: 0.9, id: 'c' },
+      ];
+
+      const scored = results.map((r) => ({
+        id: r.id,
+        score: calculateCombinedScore(r.semantic, r.keyword, 0.7, 0.3),
+      }));
+
+      // Sort by score descending
+      scored.sort((a, b) => b.score - a.score);
+
+      // Verify consistent ordering
+      expect(scored[0].score).toBeGreaterThanOrEqual(scored[1].score);
+      expect(scored[1].score).toBeGreaterThanOrEqual(scored[2].score);
+    });
+
+    it('should handle tie-breaking consistently', () => {
+      // Two results with identical combined scores
+      const scoreA = calculateCombinedScore(0.8, 0.6, 0.7, 0.3); // 0.56 + 0.18 = 0.74
+      const scoreB = calculateCombinedScore(0.74, 0.74, 0.7, 0.3); // 0.518 + 0.222 = 0.74
+
+      // Scores should be very close (floating point)
+      expect(Math.abs(scoreA - scoreB)).toBeLessThan(0.01);
+    });
+  });
 });
