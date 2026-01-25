@@ -1236,4 +1236,166 @@ describe('CodeIndexer', () => {
       expect(result.filesIndexed).toBe(1);
     });
   });
+
+  describe('incremental indexing race conditions', () => {
+    it('should handle file deletion detected via metadata', async () => {
+      const { glob } = await import('glob');
+      // Only return test.ts, simulating deleted.ts was already removed before glob
+      vi.mocked(glob as any).mockResolvedValue(['/project/test.ts']);
+
+      vi.mocked(fsPromises.readFile).mockImplementation(async (filePath) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('checkpoint.json')) {
+          throw new Error('ENOENT');
+        }
+        if (pathStr.includes('metadata.json')) {
+          return JSON.stringify({
+            lastUpdated: new Date().toISOString(),
+            fileCount: 2,
+            chunkCount: 2,
+            embeddingBackend: 'mock',
+            embeddingModel: 'mock-model',
+            embeddingDimensions: 1536,
+            version: '1.0.0',
+          });
+        }
+        return 'const x = 1;';
+      });
+
+      vi.mocked(fsPromises.stat).mockResolvedValue({ mtimeMs: Date.now() } as any);
+
+      // Include file_metadata table to enable incremental detection
+      mockConnection.tableNames.mockResolvedValue(['code_chunks', 'file_metadata']);
+      const mockTable = createMockTable();
+      // Mock metadata table with two files - one was deleted
+      const mockMetadataTable = createMockTable();
+      mockMetadataTable.query.mockReturnValue({
+        toArray: vi.fn().mockResolvedValue([
+          { filepath: 'test.ts', mtime: Date.now() - 1000 },
+          { filepath: 'deleted.ts', mtime: Date.now() - 1000 },
+        ]),
+      } as any);
+      mockConnection.openTable.mockImplementation(async (name: string) => {
+        if (name === 'file_metadata') {
+          return mockMetadataTable as any;
+        }
+        return mockTable as any;
+      });
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      // Should handle gracefully - detect deleted.ts as deleted since it's in metadata but not in glob
+      const result = await indexer.indexCodebase();
+      expect(result.incremental).toBe(true);
+      // The deleted file should be removed from the index
+      expect(mockTable.delete).toHaveBeenCalled();
+    });
+
+    it('should handle file modified during change detection', async () => {
+      const { glob } = await import('glob');
+      vi.mocked(glob as any).mockResolvedValue(['/project/test.ts']);
+
+      // File mtime changes between calls to stat
+      let statCallCount = 0;
+      const initialMtime = Date.now() - 5000;
+      const modifiedMtime = Date.now();
+
+      vi.mocked(fsPromises.readFile).mockImplementation(async (filePath) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('checkpoint.json')) {
+          throw new Error('ENOENT');
+        }
+        if (pathStr.includes('metadata.json')) {
+          return JSON.stringify({
+            lastUpdated: new Date().toISOString(),
+            fileCount: 1,
+            chunkCount: 1,
+            embeddingBackend: 'mock',
+            embeddingModel: 'mock-model',
+            embeddingDimensions: 1536, // Match mock backend dimensions
+            version: '1.0.0',
+          });
+        }
+        if (pathStr.includes('files.json')) {
+          return JSON.stringify({
+            'test.ts': initialMtime,
+          });
+        }
+        return 'const x = 1;';
+      });
+
+      vi.mocked(fsPromises.stat).mockImplementation(async () => {
+        statCallCount++;
+        // First call during change detection returns old mtime
+        // Second call (if any) returns new mtime simulating modification
+        return { mtimeMs: statCallCount === 1 ? initialMtime : modifiedMtime } as any;
+      });
+
+      mockConnection.tableNames.mockResolvedValue(['code_chunks']);
+      const mockTable = createMockTable();
+      mockConnection.openTable.mockResolvedValue(mockTable as any);
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      // Should complete without error - the file appears unchanged based on first stat
+      const result = await indexer.indexCodebase();
+      expect(result.incremental).toBe(true);
+    });
+
+    it('should handle concurrent indexCodebase calls gracefully', async () => {
+      const { glob } = await import('glob');
+      vi.mocked(glob as any).mockResolvedValue(['/project/test.ts']);
+      vi.mocked(fsPromises.readFile).mockImplementation(async (filePath) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('checkpoint.json')) {
+          throw new Error('ENOENT');
+        }
+        return 'const x = 1;';
+      });
+      vi.mocked(fsPromises.stat).mockResolvedValue({ mtimeMs: Date.now() } as any);
+      mockConnection.tableNames.mockResolvedValue([]);
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      // Start two concurrent indexing operations
+      const promise1 = indexer.indexCodebase();
+      const promise2 = indexer.indexCodebase();
+
+      // Both should complete without throwing
+      const [result1, result2] = await Promise.all([promise1, promise2]);
+
+      // Both should report success (though the actual behavior depends on implementation)
+      expect(result1.filesIndexed).toBeGreaterThanOrEqual(0);
+      expect(result2.filesIndexed).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should handle empty file list during indexing', async () => {
+      const { glob } = await import('glob');
+      // All files were deleted or none match
+      vi.mocked(glob as any).mockResolvedValue([]);
+
+      vi.mocked(fsPromises.readFile).mockImplementation(async (filePath) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('checkpoint.json')) {
+          throw new Error('ENOENT');
+        }
+        return '';
+      });
+      vi.mocked(fsPromises.stat).mockResolvedValue({ mtimeMs: Date.now() } as any);
+
+      // No existing index
+      mockConnection.tableNames.mockResolvedValue([]);
+
+      const indexer = new CodeIndexer('/project', mockBackend);
+      await indexer.initialize();
+
+      // Should handle gracefully - create empty index
+      const result = await indexer.indexCodebase();
+      expect(result.filesIndexed).toBe(0);
+      expect(result.chunksCreated).toBe(0);
+    });
+  });
 });
