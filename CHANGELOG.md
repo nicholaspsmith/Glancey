@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/nicholaspsmith/lance-context/compare/v1.4.2...v1.5.0) (2026-01-25)
+
+
+### Features
+
+* track and report AST parsing fallbacks ([#51](https://github.com/nicholaspsmith/lance-context/issues/51)) ([13c0590](https://github.com/nicholaspsmith/lance-context/commit/13c0590825f62aaa3ed78bb23a86642ee14463ff))
+
 ## [1.4.2](https://github.com/nicholaspsmith/lance-context/compare/v1.4.1...v1.4.2) (2026-01-25)
 
 
