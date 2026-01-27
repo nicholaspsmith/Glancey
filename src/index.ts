@@ -78,7 +78,9 @@ import {
   startDashboard,
   stopDashboard,
   dashboardState,
-  isPortAvailable,
+  findAvailablePort,
+  isDashboardRunning,
+  getDashboardUrl,
 } from './dashboard/index.js';
 import type { CommandName } from './dashboard/index.js';
 
@@ -332,7 +334,8 @@ async function getIndexer(): Promise<CodeIndexer> {
       const backend = await createEmbeddingBackend({
         backend: config.embedding?.backend,
         apiKey: secrets.jinaApiKey,
-        batchSize: config.indexing?.batchSize,
+        // Note: Don't pass indexing.batchSize here - that's for progress reporting batches.
+        // Ollama backend has its own DEFAULT_BATCH_SIZE (100) for API request batching.
         concurrency: config.embedding?.ollamaConcurrency,
       });
       const idx = new CodeIndexer(PROJECT_PATH, backend);
@@ -1010,6 +1013,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['name'],
         },
       },
+      // --- Dashboard Tools ---
+      {
+        name: 'open_dashboard',
+        description:
+          'Open the lance-context dashboard in the default browser. Starts the dashboard server if not already running. Works even when dashboard auto-start is disabled in config.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
     ],
   };
 });
@@ -1051,6 +1064,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     'list_concepts',
     'search_by_concept',
     'summarize_codebase',
+    // Dashboard
+    'open_dashboard',
   ];
   if (validCommands.includes(name as CommandName)) {
     dashboardState.recordCommandUsage(name as CommandName);
@@ -2217,6 +2232,46 @@ ${conceptList}`;
         };
       }
 
+      // --- Dashboard Tools ---
+      case 'open_dashboard': {
+        // Check if dashboard is already running
+        if (isDashboardRunning()) {
+          const url = getDashboardUrl();
+          if (url) {
+            openBrowser(url, PROJECT_PATH);
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Dashboard already running at ${url}. Opening in browser.` + TOOL_GUIDANCE,
+                },
+              ],
+            };
+          }
+        }
+
+        // Dashboard not running, start it
+        try {
+          const config = await getConfig();
+          const dashboard = await startDashboard({
+            config,
+            projectPath: PROJECT_PATH,
+            version: PACKAGE_VERSION,
+          });
+          openBrowser(dashboard.url, PROJECT_PATH);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Dashboard started at ${dashboard.url}. Opening in browser.` + TOOL_GUIDANCE,
+              },
+            ],
+          };
+        } catch (error) {
+          throw wrapError('Failed to start dashboard', 'internal', error);
+        }
+      }
+
       default:
         throw new LanceContextError(`Unknown tool: ${name}`, 'validation', { tool: name });
     }
@@ -2289,29 +2344,29 @@ async function main() {
 
   // Start dashboard if enabled
   if (dashboardConfig.enabled) {
-    const dashboardPort = dashboardConfig.port || 24300;
-    const portAvailable = await isPortAvailable(dashboardPort);
-
-    if (!portAvailable) {
-      // Another process is already running the dashboard
-      console.error(`[lance-context] Dashboard already running on port ${dashboardPort}`);
-    } else {
-      try {
-        const dashboard = await startDashboard({
-          port: dashboardPort,
-          config,
-          projectPath: PROJECT_PATH,
-          version: PACKAGE_VERSION,
-        });
-        console.error(`[lance-context] Dashboard started at ${dashboard.url}`);
-
-        // Open dashboard in user's default browser if configured
-        if (dashboardConfig.openBrowser) {
-          openBrowser(dashboard.url, PROJECT_PATH);
-        }
-      } catch (error) {
-        console.error('[lance-context] Failed to start dashboard:', error);
+    const configuredPort = dashboardConfig.port || 24300;
+    try {
+      const availablePort = await findAvailablePort(configuredPort);
+      if (availablePort !== configuredPort) {
+        console.error(
+          `[lance-context] Configured port ${configuredPort} unavailable, using ${availablePort}`
+        );
       }
+      const dashboard = await startDashboard({
+        port: availablePort,
+        config,
+        projectPath: PROJECT_PATH,
+        version: PACKAGE_VERSION,
+      });
+      console.error(`[lance-context] Dashboard started at ${dashboard.url}`);
+
+      // Open dashboard in user's default browser if configured
+      if (dashboardConfig.openBrowser) {
+        openBrowser(dashboard.url, PROJECT_PATH);
+      }
+    } catch (error) {
+      // findAvailablePort throws if no port found in range, or startDashboard may fail
+      console.error('[lance-context] Failed to start dashboard:', error);
     }
   }
 
