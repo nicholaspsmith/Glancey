@@ -1419,12 +1419,21 @@ export class CodeIndexer {
       : { batchSize: 200, batchDelayMs: 0 };
     const { batchDelayMs } = indexingConfig;
 
-    // Use large batch size (10k) to maximize parallelization in embedding backend
+    // Use batch size of 2000 to balance parallelization with progress visibility
     // The embedding backend will split into smaller batches and process in parallel
-    const embeddingBatchSize = 10000;
+    // With Ollama defaults (batchSize=100, concurrency=100), 2000 = 20 batches = 1 parallel round
+    const embeddingBatchSize = 2000;
 
     const startTime = Date.now();
     let processedChunks = 0;
+
+    // Report initial progress so user knows embedding has started
+    report({
+      phase: 'embedding',
+      current: 0,
+      total: chunks.length,
+      message: `Starting embedding of ${chunks.length} chunks...`,
+    });
 
     for (let i = 0; i < chunks.length; i += embeddingBatchSize) {
       const batch = chunks.slice(i, i + embeddingBatchSize);
