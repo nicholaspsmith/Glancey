@@ -4,6 +4,7 @@ export interface MockFetchResponse {
   ok: boolean;
   status: number;
   statusText?: string;
+  headers?: { get: (name: string) => string | null };
   json?: () => Promise<unknown>;
   text?: () => Promise<string>;
 }
@@ -17,6 +18,11 @@ export function createMockFetch(handler: FetchHandler) {
   return vi.fn().mockImplementation(handler);
 }
 
+/** Helper to create mock headers */
+function createMockHeaders(): { get: (name: string) => string | null } {
+  return { get: () => null };
+}
+
 /**
  * Creates a mock fetch that returns a successful JSON response
  */
@@ -24,6 +30,7 @@ export function createSuccessFetch(data: unknown): ReturnType<typeof createMockF
   return createMockFetch(async () => ({
     ok: true,
     status: 200,
+    headers: createMockHeaders(),
     json: async () => data,
     text: async () => JSON.stringify(data),
   }));
@@ -41,6 +48,7 @@ export function createErrorFetch(
     ok: false,
     status,
     statusText,
+    headers: createMockHeaders(),
     json: async () => ({ error: body }),
     text: async () => body,
   }));
@@ -76,6 +84,7 @@ export function createJinaEmbeddingResponse(embeddings: number[][]): MockFetchRe
   return {
     ok: true,
     status: 200,
+    headers: createMockHeaders(),
     json: async () => ({
       data: embeddings.map((embedding) => ({ embedding })),
     }),
@@ -93,6 +102,7 @@ export function createOllamaEmbeddingResponse(embedding: number[]): MockFetchRes
   return {
     ok: true,
     status: 200,
+    headers: createMockHeaders(),
     json: async () => ({ embedding }),
     text: async () => JSON.stringify({ embedding }),
   };
@@ -105,6 +115,7 @@ export function createOllamaBatchEmbeddingResponse(embeddings: number[][]): Mock
   return {
     ok: true,
     status: 200,
+    headers: createMockHeaders(),
     json: async () => ({ embeddings }),
     text: async () => JSON.stringify({ embeddings }),
   };
