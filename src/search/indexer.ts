@@ -1438,6 +1438,9 @@ export class CodeIndexer {
     for (let i = 0; i < chunks.length; i += embeddingBatchSize) {
       const batch = chunks.slice(i, i + embeddingBatchSize);
       const texts = batch.map((c) => c.content);
+      console.error(
+        `[lance-context] Sending ${texts.length} texts to embedding backend (batch ${Math.floor(i / embeddingBatchSize) + 1}/${Math.ceil(chunks.length / embeddingBatchSize)})...`
+      );
       const embeddings = await this.embeddingBackend.embedBatch(texts);
       batch.forEach((chunk, idx) => {
         chunk.embedding = embeddings[idx];
