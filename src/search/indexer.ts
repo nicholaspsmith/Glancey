@@ -495,22 +495,26 @@ export class CodeIndexer {
   private async collectFileMtimes(files: string[]): Promise<Record<string, number>> {
     const mtimes: Record<string, number> = {};
 
-    // Parallelize stat calls for performance (thousands of files)
-    const results = await Promise.all(
-      files.map(async (filepath) => {
-        try {
-          const relativePath = path.relative(this.projectPath, filepath);
-          const mtime = await this.getFileMtime(filepath);
-          return { relativePath, mtime };
-        } catch {
-          return null; // Skip files that can't be stat'd
-        }
-      })
-    );
+    // Process in batches to avoid overwhelming the system with file descriptors
+    const batchSize = 500;
+    for (let i = 0; i < files.length; i += batchSize) {
+      const batch = files.slice(i, i + batchSize);
+      const results = await Promise.all(
+        batch.map(async (filepath) => {
+          try {
+            const relativePath = path.relative(this.projectPath, filepath);
+            const mtime = await this.getFileMtime(filepath);
+            return { relativePath, mtime };
+          } catch {
+            return null; // Skip files that can't be stat'd
+          }
+        })
+      );
 
-    for (const result of results) {
-      if (result) {
-        mtimes[result.relativePath] = result.mtime;
+      for (const result of results) {
+        if (result) {
+          mtimes[result.relativePath] = result.mtime;
+        }
       }
     }
 
@@ -1017,16 +1021,8 @@ export class CodeIndexer {
       message: `Created ${allChunks.length} chunks`,
     });
 
-    // Collect file modification times for checkpoint freshness validation
-    report({
-      phase: 'chunking',
-      current: files.length,
-      total: files.length,
-      message: `Collecting file metadata...`,
-    });
-    const fileMtimes = await this.collectFileMtimes(files);
-
     // Save checkpoint after chunking (non-blocking - embedding starts immediately)
+    // Skip mtime collection - it's slow for large codebases and only used for checkpoint validation
     this.saveCheckpoint({
       phase: 'chunking',
       startedAt,
@@ -1035,7 +1031,6 @@ export class CodeIndexer {
       pendingChunks: allChunks,
       embeddingBackend: this.embeddingBackend.name,
       embeddingModel: this.embeddingBackend.getModel(),
-      fileMtimes,
     });
 
     // Generate embeddings in batches
@@ -1051,7 +1046,6 @@ export class CodeIndexer {
         embeddedChunks: allChunks,
         embeddingBackend: this.embeddingBackend.name,
         embeddingModel: this.embeddingBackend.getModel(),
-        fileMtimes,
       },
       { blocking: true }
     );
