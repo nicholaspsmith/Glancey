@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/nicholaspsmith/lance-context/compare/v1.18.6...v1.19.0) (2026-01-27)
+
+
+### Features
+
+* display project name in dashboard header ([#87](https://github.com/nicholaspsmith/lance-context/issues/87)) ([486a43c](https://github.com/nicholaspsmith/lance-context/commit/486a43c66823ece9d141883de47e68dffea8ca06))
+
 ## [1.18.6](https://github.com/nicholaspsmith/lance-context/compare/v1.18.5...v1.18.6) (2026-01-27)
 
 
