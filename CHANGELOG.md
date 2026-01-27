@@ -1,3 +1,10 @@
+## [1.15.2](https://github.com/nicholaspsmith/lance-context/compare/v1.15.1...v1.15.2) (2026-01-27)
+
+
+### Bug Fixes
+
+* hide save button when settings unchanged ([#72](https://github.com/nicholaspsmith/lance-context/issues/72)) ([433d37b](https://github.com/nicholaspsmith/lance-context/commit/433d37b732def7cf28e9ff38282fcb9e805456b4))
+
 ## [1.15.1](https://github.com/nicholaspsmith/lance-context/compare/v1.15.0...v1.15.1) (2026-01-27)
 
 
