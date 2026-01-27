@@ -1,3 +1,10 @@
+## [1.18.2](https://github.com/nicholaspsmith/lance-context/compare/v1.18.1...v1.18.2) (2026-01-27)
+
+
+### Performance Improvements
+
+* skip mtime collection during indexing ([#80](https://github.com/nicholaspsmith/lance-context/issues/80)) ([bffb6a9](https://github.com/nicholaspsmith/lance-context/commit/bffb6a97adf1538c3f7729ee8f2d6c4b44947a0d))
+
 ## [1.18.1](https://github.com/nicholaspsmith/lance-context/compare/v1.18.0...v1.18.1) (2026-01-27)
 
 
