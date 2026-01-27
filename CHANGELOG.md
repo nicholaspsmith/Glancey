@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/nicholaspsmith/lance-context/compare/v1.16.0...v1.17.0) (2026-01-27)
+
+
+### Features
+
+* add parallel batch processing to Ollama backend ([#76](https://github.com/nicholaspsmith/lance-context/issues/76)) ([b0161ac](https://github.com/nicholaspsmith/lance-context/commit/b0161ac47d964abf5f1cd9f3a352e02fb0a5a796))
+
 # [1.16.0](https://github.com/nicholaspsmith/lance-context/compare/v1.15.3...v1.16.0) (2026-01-27)
 
 
