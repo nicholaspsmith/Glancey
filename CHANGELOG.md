@@ -1,3 +1,10 @@
+## [1.18.3](https://github.com/nicholaspsmith/lance-context/compare/v1.18.2...v1.18.3) (2026-01-27)
+
+
+### Bug Fixes
+
+* add initial embedding progress message and reduce batch size ([#81](https://github.com/nicholaspsmith/lance-context/issues/81)) ([6af6ee1](https://github.com/nicholaspsmith/lance-context/commit/6af6ee17417c40a65e9d7423287f4c920076dc1e))
+
 ## [1.18.2](https://github.com/nicholaspsmith/lance-context/compare/v1.18.1...v1.18.2) (2026-01-27)
 
 
