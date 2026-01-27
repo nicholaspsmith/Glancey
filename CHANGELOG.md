@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/nicholaspsmith/lance-context/compare/v1.13.1...v1.14.0) (2026-01-27)
+
+
+### Features
+
+* switch default Ollama model to qwen3-embedding ([#69](https://github.com/nicholaspsmith/lance-context/issues/69)) ([1957ba3](https://github.com/nicholaspsmith/lance-context/commit/1957ba3c5933aa89062bba095a2a2a73f4c3f560))
+
 ## [1.13.1](https://github.com/nicholaspsmith/lance-context/compare/v1.13.0...v1.13.1) (2026-01-26)
 
 
