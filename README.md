@@ -9,6 +9,18 @@
   <img src="https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg" alt="Node.js version">
 </p>
 
+> [!WARNING]
+> **Versions 1.18.x have known performance issues with Ollama embedding.**
+>
+> If you experience hangs during indexing, use the stable version:
+> ```bash
+> npm install lance-context@1.17.1
+> ```
+> Or with Claude Code:
+> ```bash
+> claude mcp add --scope user --transport stdio lance-context -- npx -y lance-context@1.17.1
+> ```
+
 # lance-context
 
 An MCP plugin that adds semantic code search to Claude Code and other AI coding agents, giving them deep context from your entire codebase.
@@ -26,13 +38,15 @@ An MCP plugin that adds semantic code search to Claude Code and other AI coding 
 
 ### Quick Install (Recommended)
 
-Add lance-context to Claude Code with automatic updates:
+Add lance-context to Claude Code:
 
 ```bash
-claude mcp add --scope user --transport stdio lance-context -- npx -y lance-context@latest
+claude mcp add --scope user --transport stdio lance-context -- npx -y lance-context@1.17.1
 ```
 
-This ensures you always run the latest version. Restart Claude Code to start using semantic search.
+Restart Claude Code to start using semantic search.
+
+> **Note:** To try the latest (alpha) version: `npx -y lance-context@alpha`
 
 ### Global Install (Alternative)
 
