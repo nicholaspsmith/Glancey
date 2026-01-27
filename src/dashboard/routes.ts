@@ -3,7 +3,14 @@ import { dashboardState } from './state.js';
 import { sseManager } from './events.js';
 import { getDashboardHTML } from './ui.js';
 import { getBeadsStatus } from './beads.js';
-import { saveEmbeddingSettings, getEmbeddingSettings, type EmbeddingSettings } from '../config.js';
+import {
+  saveEmbeddingSettings,
+  getEmbeddingSettings,
+  saveDashboardSettings,
+  getDashboardSettings,
+  type EmbeddingSettings,
+  type DashboardSettings,
+} from '../config.js';
 
 /**
  * Send a JSON response
@@ -198,6 +205,63 @@ async function handleSaveEmbeddingSettings(
 }
 
 /**
+ * Handle GET /api/settings/dashboard - Get current dashboard settings
+ */
+async function handleGetDashboardSettings(
+  _req: IncomingMessage,
+  res: ServerResponse
+): Promise<void> {
+  const projectPath = dashboardState.getProjectPath();
+  if (!projectPath) {
+    sendJSON(res, { error: 'Project path not set' }, 503);
+    return;
+  }
+
+  try {
+    const settings = await getDashboardSettings(projectPath);
+    sendJSON(res, settings);
+  } catch (error) {
+    sendJSON(res, { error: String(error) }, 500);
+  }
+}
+
+/**
+ * Handle POST /api/settings/dashboard - Save dashboard settings
+ */
+async function handleSaveDashboardSettings(
+  req: IncomingMessage,
+  res: ServerResponse
+): Promise<void> {
+  const projectPath = dashboardState.getProjectPath();
+  if (!projectPath) {
+    sendJSON(res, { error: 'Project path not set' }, 503);
+    return;
+  }
+
+  try {
+    const body = (await parseJsonBody(req)) as DashboardSettings;
+
+    if (typeof body.enabled !== 'boolean') {
+      sendJSON(res, { error: 'enabled must be a boolean' }, 400);
+      return;
+    }
+
+    await saveDashboardSettings(projectPath, body);
+
+    const message = body.enabled
+      ? 'Dashboard enabled. Changes take effect on next MCP server restart.'
+      : 'Dashboard disabled. Use the open_dashboard MCP tool to start manually, or re-enable and restart.';
+
+    sendJSON(res, {
+      success: true,
+      message,
+    });
+  } catch (error) {
+    sendJSON(res, { error: String(error) }, 500);
+  }
+}
+
+/**
  * Route dispatcher
  */
 export async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -222,6 +286,9 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       switch (routePath) {
         case '/api/settings/embedding':
           await handleSaveEmbeddingSettings(req, res);
+          return;
+        case '/api/settings/dashboard':
+          await handleSaveDashboardSettings(req, res);
           return;
         default:
           sendJSON(res, { error: 'Method not allowed' }, 405);
@@ -259,6 +326,9 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         break;
       case '/api/settings/embedding':
         await handleGetEmbeddingSettings(req, res);
+        break;
+      case '/api/settings/dashboard':
+        await handleGetDashboardSettings(req, res);
         break;
       default:
         send404(res);

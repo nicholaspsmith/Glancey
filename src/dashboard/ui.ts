@@ -874,6 +874,34 @@ export function getDashboardHTML(): string {
         </div>
       </div>
 
+      <!-- Dashboard Settings Card -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Dashboard Settings</span>
+          <span class="badge" id="dashboardBadge">Enabled</span>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Auto-Start on MCP Launch</div>
+          <div class="stat-value small" id="dashboardEnabled">-</div>
+        </div>
+        <div class="settings-form" id="dashboardSettingsForm">
+          <div class="form-group">
+            <label for="dashboardEnabledSelect">Dashboard Auto-Start</label>
+            <select id="dashboardEnabledSelect" class="form-select">
+              <option value="true">Enabled (auto-start with MCP server)</option>
+              <option value="false">Disabled (manual start only)</option>
+            </select>
+          </div>
+          <div class="form-hint">
+            When disabled, use the <code>open_dashboard</code> MCP tool to start manually.
+          </div>
+          <div class="form-actions">
+            <button type="button" id="saveDashboardBtn" class="btn btn-primary" style="display: none;">Save Settings</button>
+            <span id="saveDashboardStatus" class="save-status"></span>
+          </div>
+        </div>
+      </div>
+
       <!-- Configuration Card -->
       <div class="card">
         <div class="card-header">
@@ -1158,6 +1186,85 @@ export function getDashboardHTML(): string {
 
     // Load embedding settings on page load
     loadEmbeddingSettings();
+
+    // Dashboard settings form elements
+    const dashboardBadge = document.getElementById('dashboardBadge');
+    const dashboardEnabled = document.getElementById('dashboardEnabled');
+    const dashboardEnabledSelect = document.getElementById('dashboardEnabledSelect');
+    const saveDashboardBtn = document.getElementById('saveDashboardBtn');
+    const saveDashboardStatus = document.getElementById('saveDashboardStatus');
+
+    // Track saved dashboard settings
+    let savedDashboardEnabled = true;
+
+    // Check if dashboard settings changed
+    function hasDashboardSettingsChanged() {
+      return dashboardEnabledSelect.value !== String(savedDashboardEnabled);
+    }
+
+    // Update dashboard save button visibility
+    function updateDashboardSaveButtonVisibility() {
+      saveDashboardBtn.style.display = hasDashboardSettingsChanged() ? 'inline-block' : 'none';
+      saveDashboardStatus.textContent = '';
+    }
+
+    dashboardEnabledSelect.addEventListener('change', updateDashboardSaveButtonVisibility);
+
+    // Load current dashboard settings
+    async function loadDashboardSettings() {
+      try {
+        const response = await fetch('/api/settings/dashboard');
+        if (response.ok) {
+          const settings = await response.json();
+          savedDashboardEnabled = settings.enabled;
+
+          // Update form and display
+          dashboardEnabledSelect.value = String(settings.enabled);
+          dashboardEnabled.textContent = settings.enabled ? 'Enabled' : 'Disabled';
+          dashboardBadge.textContent = settings.enabled ? 'Enabled' : 'Disabled';
+          dashboardBadge.className = settings.enabled ? 'badge success' : 'badge warning';
+          updateDashboardSaveButtonVisibility();
+        }
+      } catch (error) {
+        console.error('Failed to load dashboard settings:', error);
+      }
+    }
+
+    // Save dashboard settings
+    saveDashboardBtn.addEventListener('click', async function() {
+      const enabled = dashboardEnabledSelect.value === 'true';
+
+      saveDashboardBtn.disabled = true;
+      saveDashboardStatus.textContent = 'Saving...';
+      saveDashboardStatus.className = 'save-status';
+
+      try {
+        const response = await fetch('/api/settings/dashboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          saveDashboardStatus.textContent = result.message || 'Saved!';
+          saveDashboardStatus.className = 'save-status success';
+          loadDashboardSettings();
+        } else {
+          saveDashboardStatus.textContent = result.error || 'Failed to save';
+          saveDashboardStatus.className = 'save-status error';
+        }
+      } catch (error) {
+        saveDashboardStatus.textContent = 'Network error';
+        saveDashboardStatus.className = 'save-status error';
+      } finally {
+        saveDashboardBtn.disabled = false;
+      }
+    });
+
+    // Load dashboard settings on page load
+    loadDashboardSettings();
 
     // Format date
     function formatDate(isoString) {
