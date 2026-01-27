@@ -1,3 +1,10 @@
+## [1.15.1](https://github.com/nicholaspsmith/lance-context/compare/v1.15.0...v1.15.1) (2026-01-27)
+
+
+### Bug Fixes
+
+* remove form-hints and add batchSizeGroup ID ([#71](https://github.com/nicholaspsmith/lance-context/issues/71)) ([0358e3f](https://github.com/nicholaspsmith/lance-context/commit/0358e3f878cfae403d0da073bdbcc22dd5fd6c74))
+
 # [1.15.0](https://github.com/nicholaspsmith/lance-context/compare/v1.14.0...v1.15.0) (2026-01-27)
 
 
