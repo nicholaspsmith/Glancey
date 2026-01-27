@@ -20,6 +20,8 @@ const SearchConfigSchema = z.object({
 const EmbeddingConfigSchema = z.object({
   backend: z.enum(['jina', 'ollama']).optional(),
   model: z.string().optional(),
+  /** Number of concurrent requests to Ollama (default: 10). Increase if your system has capacity. */
+  ollamaConcurrency: z.number().min(1).max(100).optional(),
 });
 
 const DashboardConfigSchema = z.object({
