@@ -1040,13 +1040,39 @@ export function getDashboardHTML(): string {
     const saveEmbeddingBtn = document.getElementById('saveEmbeddingBtn');
     const saveStatus = document.getElementById('saveStatus');
 
+    // Track saved settings to detect changes
+    let savedSettings = { backend: 'auto', ollamaConcurrency: '200', batchSize: '200' };
+
+    // Check if current form values differ from saved settings
+    function hasSettingsChanged() {
+      const currentBackend = backendSelect.value;
+      const currentConcurrency = concurrencySelect.value;
+      const currentBatchSize = batchSizeSelect.value;
+      const hasNewApiKey = currentBackend === 'jina' && apiKeyInput.value.trim() !== '';
+
+      return currentBackend !== savedSettings.backend ||
+             currentConcurrency !== savedSettings.ollamaConcurrency ||
+             currentBatchSize !== savedSettings.batchSize ||
+             hasNewApiKey;
+    }
+
+    // Update save button visibility based on changes
+    function updateSaveButtonVisibility() {
+      saveEmbeddingBtn.style.display = hasSettingsChanged() ? 'inline-block' : 'none';
+      saveStatus.textContent = '';
+    }
+
     // Toggle settings visibility based on backend selection
     function updateBackendVisibility() {
       const isJina = backendSelect.value === 'jina';
       apiKeyGroup.style.display = isJina ? 'block' : 'none';
       ollamaSettingsGroup.style.display = isJina ? 'none' : 'block';
+      updateSaveButtonVisibility();
     }
     backendSelect.addEventListener('change', updateBackendVisibility);
+    concurrencySelect.addEventListener('change', updateSaveButtonVisibility);
+    batchSizeSelect.addEventListener('change', updateSaveButtonVisibility);
+    apiKeyInput.addEventListener('input', updateSaveButtonVisibility);
 
     // Load current embedding settings
     async function loadEmbeddingSettings() {
@@ -1054,10 +1080,19 @@ export function getDashboardHTML(): string {
         const response = await fetch('/api/settings/embedding');
         if (response.ok) {
           const settings = await response.json();
-          backendSelect.value = settings.backend || 'auto';
-          concurrencySelect.value = String(settings.ollamaConcurrency || 200);
-          batchSizeSelect.value = String(settings.batchSize || 200);
+          const backend = settings.backend || 'auto';
+          const concurrency = String(settings.ollamaConcurrency || 200);
+          const batchSize = String(settings.batchSize || 200);
+
+          // Update saved settings
+          savedSettings = { backend, ollamaConcurrency: concurrency, batchSize };
+
+          // Update form values
+          backendSelect.value = backend;
+          concurrencySelect.value = concurrency;
+          batchSizeSelect.value = batchSize;
           updateBackendVisibility();
+          updateSaveButtonVisibility();
 
           // Update status badge
           if (settings.hasApiKey) {
