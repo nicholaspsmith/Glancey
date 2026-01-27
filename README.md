@@ -120,6 +120,8 @@ For most projects, you only need to specify what to include:
 | `excludePatterns` | Glob patterns for files to exclude | `["**/node_modules/**", "**/dist/**", "**/.git/**", "**/build/**", "**/target/**", "**/__pycache__/**", "**/venv/**", "**/.venv/**", "**/vendor/**", "**/*.min.js", "**/*.min.css"]` |
 | `embedding.backend` | Embedding provider: `"jina"` or `"ollama"` | Auto-detect based on available API keys |
 | `embedding.model` | Override the default embedding model | Backend default |
+| `embedding.ollamaConcurrency` | Max concurrent Ollama requests (1-200) | `100` |
+| `indexing.batchSize` | Texts per embedding batch request (1-1000) | `200` |
 | `chunking.maxLines` | Maximum lines per chunk | `100` |
 | `chunking.overlap` | Overlapping lines between chunks for context continuity | `20` |
 | `search.semanticWeight` | Weight for semantic (vector) similarity (0-1) | `0.7` |
@@ -197,14 +199,21 @@ lance-context automatically selects the best available backend (in priority orde
 
 Ollama provides free, local embeddings with no API rate limits. Perfect for indexing large codebases.
 
+**Requirements:** Ollama 0.2.0 or newer (for batch embedding API)
+
 1. **Install Ollama** from [ollama.com](https://ollama.com)
 
-2. **Pull the embedding model:**
+2. **Verify version** (must be 0.2.0+):
+   ```bash
+   ollama --version
+   ```
+
+3. **Pull the embedding model:**
    ```bash
    ollama pull qwen3-embedding:0.6b
    ```
 
-3. **Verify it's working:**
+4. **Verify it's working:**
    ```bash
    ollama run qwen3-embedding:0.6b "test"
    ```
