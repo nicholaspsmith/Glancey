@@ -38,7 +38,9 @@ export type CommandName =
   // Clustering tools
   | 'list_concepts'
   | 'search_by_concept'
-  | 'summarize_codebase';
+  | 'summarize_codebase'
+  // Dashboard tools
+  | 'open_dashboard';
 
 /**
  * Command usage statistics
@@ -99,6 +101,8 @@ const COMMAND_LABELS: Record<CommandName, string> = {
   list_concepts: 'List Concepts',
   search_by_concept: 'Search by Concept',
   summarize_codebase: 'Summarize Codebase',
+  // Dashboard tools
+  open_dashboard: 'Open Dashboard',
 };
 
 /** Maximum number of event listeners to prevent memory leaks */
@@ -325,6 +329,8 @@ export class DashboardStateManager extends EventEmitter {
       'list_concepts',
       'search_by_concept',
       'summarize_codebase',
+      // Dashboard
+      'open_dashboard',
     ];
 
     return allCommands.map((command) => ({
