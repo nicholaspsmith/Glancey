@@ -250,7 +250,7 @@ describe('OllamaBackend', () => {
       expect(result).toEqual([[0.1], [0.2], [0.3], [0.4], [0.5]]);
     });
 
-    it('should use default batch size of 10', async () => {
+    it('should use default batch size of 50', async () => {
       const mockFetch = vi.fn().mockImplementation(async (_url, options) => {
         const body = JSON.parse(options.body as string);
         const inputLen = body.input.length;
@@ -260,14 +260,14 @@ describe('OllamaBackend', () => {
       });
       vi.stubGlobal('fetch', mockFetch);
 
-      // Create backend without custom batchSize (should use default 10)
+      // Create backend without custom batchSize (should use default 50)
       const backend = new OllamaBackend({ backend: 'ollama' });
-      const texts = Array.from({ length: 25 }, (_, i) => `text${i}`);
+      const texts = Array.from({ length: 120 }, (_, i) => `text${i}`);
       const result = await backend.embedBatch(texts);
 
-      // Should make 3 batch requests (10+10+5)
+      // Should make 3 batch requests (50+50+20)
       expect(mockFetch).toHaveBeenCalledTimes(3);
-      expect(result).toHaveLength(25);
+      expect(result).toHaveLength(120);
     });
 
     it('should process batches in parallel based on concurrency', async () => {
@@ -292,16 +292,17 @@ describe('OllamaBackend', () => {
       expect(result).toHaveLength(4);
     });
 
-    it('should use default concurrency of 4', async () => {
+    it('should use default concurrency of 20', async () => {
       const mockFetch = vi.fn().mockResolvedValue(createOllamaBatchEmbeddingResponse([[0.1]]));
       vi.stubGlobal('fetch', mockFetch);
 
       // Create backend with small batchSize to trigger multiple batches
       const backend = new OllamaBackend({ backend: 'ollama', batchSize: 1 });
-      await backend.embedBatch(['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8']);
+      const texts = Array.from({ length: 25 }, (_, i) => `t${i}`);
+      await backend.embedBatch(texts);
 
-      // With concurrency=4 and 8 items with batchSize=1, should still make 8 requests
-      expect(mockFetch).toHaveBeenCalledTimes(8);
+      // With concurrency=20 and 25 items with batchSize=1, should make 25 requests
+      expect(mockFetch).toHaveBeenCalledTimes(25);
     });
 
     it('should preserve result order with parallel processing', async () => {
