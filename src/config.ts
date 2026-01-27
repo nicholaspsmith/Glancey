@@ -647,6 +647,10 @@ export interface EmbeddingSettings {
   backend: 'jina' | 'ollama';
   apiKey?: string;
   ollamaUrl?: string;
+  /** Number of concurrent requests to Ollama */
+  ollamaConcurrency?: number;
+  /** Number of chunks per embedding batch */
+  batchSize?: number;
 }
 
 /**
@@ -675,6 +679,19 @@ export async function saveEmbeddingSettings(
     backend: settings.backend,
   };
 
+  // Update ollamaConcurrency if provided
+  if (settings.ollamaConcurrency !== undefined) {
+    existingConfig.embedding.ollamaConcurrency = settings.ollamaConcurrency;
+  }
+
+  // Update indexing batch size if provided
+  if (settings.batchSize !== undefined) {
+    existingConfig.indexing = {
+      ...existingConfig.indexing,
+      batchSize: settings.batchSize,
+    };
+  }
+
   // Save config
   await fs.writeFile(configPath, JSON.stringify(existingConfig, null, 2));
 
@@ -691,6 +708,8 @@ export async function getEmbeddingSettings(projectPath: string): Promise<{
   backend: 'jina' | 'ollama' | 'auto';
   hasApiKey: boolean;
   ollamaUrl?: string;
+  ollamaConcurrency: number;
+  batchSize: number;
 }> {
   const config = await loadConfig(projectPath);
   const secrets = await loadSecrets(projectPath);
@@ -699,5 +718,7 @@ export async function getEmbeddingSettings(projectPath: string): Promise<{
     backend: config.embedding?.backend || 'auto',
     hasApiKey: !!(secrets.jinaApiKey || process.env.JINA_API_KEY),
     ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
+    ollamaConcurrency: config.embedding?.ollamaConcurrency || 200,
+    batchSize: config.indexing?.batchSize || DEFAULT_INDEXING.batchSize,
   };
 }
