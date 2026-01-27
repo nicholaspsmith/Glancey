@@ -1,3 +1,20 @@
+# [1.18.0](https://github.com/nicholaspsmith/lance-context/compare/v1.17.1...v1.18.0) (2026-01-27)
+
+
+### Bug Fixes
+
+* improve embedding batch processing performance ([7cc7e62](https://github.com/nicholaspsmith/lance-context/commit/7cc7e629656e6d4e3005a23209dc738c45b2f78d))
+
+
+### Features
+
+* add dashboard port auto-increment and disable toggle ([8743535](https://github.com/nicholaspsmith/lance-context/commit/8743535e0d11770749c6d8c9f76d1425feae37f4))
+
+
+### Performance Improvements
+
+* strip chunk content from checkpoints to reduce size ([1dfa2b8](https://github.com/nicholaspsmith/lance-context/commit/1dfa2b834e919e21d9e476218814555043844672))
+
 ## [1.17.1](https://github.com/nicholaspsmith/lance-context/compare/v1.17.0...v1.17.1) (2026-01-27)
 
 
