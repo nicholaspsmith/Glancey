@@ -722,3 +722,65 @@ export async function getEmbeddingSettings(projectPath: string): Promise<{
     batchSize: config.indexing?.batchSize || DEFAULT_INDEXING.batchSize,
   };
 }
+
+/**
+ * Dashboard settings for dashboard configuration via UI
+ */
+export interface DashboardSettings {
+  enabled: boolean;
+  port?: number;
+  openBrowser?: boolean;
+}
+
+/**
+ * Save dashboard settings to .lance-context.json
+ */
+export async function saveDashboardSettings(
+  projectPath: string,
+  settings: DashboardSettings
+): Promise<void> {
+  const configPath = path.join(projectPath, '.lance-context.json');
+  let existingConfig: LanceContextConfig = {};
+
+  try {
+    const content = await fs.readFile(configPath, 'utf-8');
+    existingConfig = JSON.parse(content);
+  } catch {
+    // File doesn't exist, start fresh
+  }
+
+  // Update dashboard config
+  existingConfig.dashboard = {
+    ...existingConfig.dashboard,
+    enabled: settings.enabled,
+  };
+
+  // Only update port if provided
+  if (settings.port !== undefined) {
+    existingConfig.dashboard.port = settings.port;
+  }
+
+  // Only update openBrowser if provided
+  if (settings.openBrowser !== undefined) {
+    existingConfig.dashboard.openBrowser = settings.openBrowser;
+  }
+
+  await fs.writeFile(configPath, JSON.stringify(existingConfig, null, 2));
+}
+
+/**
+ * Get current dashboard settings
+ */
+export async function getDashboardSettings(projectPath: string): Promise<{
+  enabled: boolean;
+  port: number;
+  openBrowser: boolean;
+}> {
+  const config = await loadConfig(projectPath);
+
+  return {
+    enabled: config.dashboard?.enabled ?? DEFAULT_DASHBOARD.enabled,
+    port: config.dashboard?.port ?? DEFAULT_DASHBOARD.port,
+    openBrowser: config.dashboard?.openBrowser ?? DEFAULT_DASHBOARD.openBrowser,
+  };
+}

@@ -337,10 +337,54 @@ export class CodeIndexer {
 
   /**
    * Save indexing checkpoint to disk for crash recovery.
+   * Strips chunk content to reduce checkpoint size - content is re-read on resume.
    */
   private async saveCheckpoint(checkpoint: IndexCheckpoint): Promise<void> {
     await fs.mkdir(this.indexPath, { recursive: true });
-    await fs.writeFile(this.checkpointPath, JSON.stringify(checkpoint, null, 2));
+
+    // Strip content from chunks to reduce checkpoint size (can be 50MB+ for large codebases)
+    // Content will be re-read from files on checkpoint resume
+    const lightCheckpoint: IndexCheckpoint = {
+      ...checkpoint,
+      pendingChunks: checkpoint.pendingChunks?.map((c) => ({ ...c, content: '' })),
+      embeddedChunks: checkpoint.embeddedChunks?.map((c) => ({ ...c, content: '' })),
+    };
+
+    await fs.writeFile(this.checkpointPath, JSON.stringify(lightCheckpoint));
+  }
+
+  /**
+   * Re-read chunk content from source files.
+   * Used when resuming from a checkpoint that has stripped content.
+   */
+  private async rehydrateChunkContent(chunks: CodeChunk[]): Promise<void> {
+    // Group chunks by file for efficient reading
+    const chunksByFile = new Map<string, CodeChunk[]>();
+    for (const chunk of chunks) {
+      const existing = chunksByFile.get(chunk.filepath) || [];
+      existing.push(chunk);
+      chunksByFile.set(chunk.filepath, existing);
+    }
+
+    // Read each file once and populate all its chunks
+    await Promise.all(
+      Array.from(chunksByFile.entries()).map(async ([filepath, fileChunks]) => {
+        try {
+          const fullPath = path.join(this.projectPath, filepath);
+          const fileContent = await fs.readFile(fullPath, 'utf-8');
+          const lines = fileContent.split('\n');
+
+          for (const chunk of fileChunks) {
+            chunk.content = lines.slice(chunk.startLine - 1, chunk.endLine).join('\n');
+          }
+        } catch {
+          // File may have been deleted - mark chunk for removal
+          for (const chunk of fileChunks) {
+            chunk.content = '';
+          }
+        }
+      })
+    );
   }
 
   /**
@@ -435,14 +479,26 @@ export class CodeIndexer {
    */
   private async collectFileMtimes(files: string[]): Promise<Record<string, number>> {
     const mtimes: Record<string, number> = {};
-    for (const filepath of files) {
-      try {
-        const relativePath = path.relative(this.projectPath, filepath);
-        mtimes[relativePath] = await this.getFileMtime(filepath);
-      } catch {
-        // Skip files that can't be stat'd
+
+    // Parallelize stat calls for performance (thousands of files)
+    const results = await Promise.all(
+      files.map(async (filepath) => {
+        try {
+          const relativePath = path.relative(this.projectPath, filepath);
+          const mtime = await this.getFileMtime(filepath);
+          return { relativePath, mtime };
+        } catch {
+          return null; // Skip files that can't be stat'd
+        }
+      })
+    );
+
+    for (const result of results) {
+      if (result) {
+        mtimes[result.relativePath] = result.mtime;
       }
     }
+
     return mtimes;
   }
 
@@ -947,9 +1003,21 @@ export class CodeIndexer {
     });
 
     // Collect file modification times for checkpoint freshness validation
+    report({
+      phase: 'chunking',
+      current: files.length,
+      total: files.length,
+      message: `Collecting file metadata...`,
+    });
     const fileMtimes = await this.collectFileMtimes(files);
 
     // Save checkpoint after chunking (before expensive embedding phase)
+    report({
+      phase: 'chunking',
+      current: files.length,
+      total: files.length,
+      message: `Saving checkpoint (${allChunks.length} chunks)...`,
+    });
     await this.saveCheckpoint({
       phase: 'chunking',
       startedAt,
@@ -1206,6 +1274,16 @@ export class CodeIndexer {
         }
 
         allChunks = checkpoint.pendingChunks;
+
+        // Re-read chunk content from files (stripped during checkpoint save to reduce size)
+        report({
+          phase: 'chunking',
+          current: 0,
+          total: allChunks.length,
+          message: `Re-reading content for ${allChunks.length} chunks...`,
+        });
+        await this.rehydrateChunkContent(allChunks);
+
         report({
           phase: 'chunking',
           current: checkpoint.files.length,
@@ -1240,6 +1318,16 @@ export class CodeIndexer {
         }
 
         allChunks = checkpoint.embeddedChunks;
+
+        // Re-read chunk content from files (stripped during checkpoint save to reduce size)
+        report({
+          phase: 'embedding',
+          current: 0,
+          total: allChunks.length,
+          message: `Re-reading content for ${allChunks.length} chunks...`,
+        });
+        await this.rehydrateChunkContent(allChunks);
+
         report({
           phase: 'embedding',
           current: allChunks.length,
