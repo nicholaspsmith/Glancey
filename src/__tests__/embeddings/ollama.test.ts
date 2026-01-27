@@ -146,6 +146,7 @@ describe('OllamaBackend', () => {
           body: JSON.stringify({
             model: DEFAULT_OLLAMA_MODEL,
             input: ['test text'],
+            keep_alive: '10m',
           }),
         })
       );
@@ -211,6 +212,7 @@ describe('OllamaBackend', () => {
           body: JSON.stringify({
             model: DEFAULT_OLLAMA_MODEL,
             input: ['text1', 'text2', 'text3'],
+            keep_alive: '10m',
           }),
         })
       );
@@ -248,22 +250,24 @@ describe('OllamaBackend', () => {
       expect(result).toEqual([[0.1], [0.2], [0.3], [0.4], [0.5]]);
     });
 
-    it('should use default batch size of 100', async () => {
-      const embeddings = Array.from({ length: 150 }, (_, i) => [i * 0.01]);
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValueOnce(createOllamaBatchEmbeddingResponse(embeddings.slice(0, 100)))
-        .mockResolvedValueOnce(createOllamaBatchEmbeddingResponse(embeddings.slice(100)));
+    it('should use default batch size of 10', async () => {
+      const mockFetch = vi.fn().mockImplementation(async (_url, options) => {
+        const body = JSON.parse(options.body as string);
+        const inputLen = body.input.length;
+        return createOllamaBatchEmbeddingResponse(
+          Array.from({ length: inputLen }, (_, i) => [i * 0.01])
+        );
+      });
       vi.stubGlobal('fetch', mockFetch);
 
-      // Create backend without custom batchSize (should use default 100)
+      // Create backend without custom batchSize (should use default 10)
       const backend = new OllamaBackend({ backend: 'ollama' });
-      const texts = Array.from({ length: 150 }, (_, i) => `text${i}`);
+      const texts = Array.from({ length: 25 }, (_, i) => `text${i}`);
       const result = await backend.embedBatch(texts);
 
-      // Should make 2 batch requests (100 + 50)
-      expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(result).toHaveLength(150);
+      // Should make 3 batch requests (10+10+5)
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(result).toHaveLength(25);
     });
 
     it('should process batches in parallel based on concurrency', async () => {
