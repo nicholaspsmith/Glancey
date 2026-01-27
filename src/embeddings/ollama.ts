@@ -2,14 +2,14 @@ import type { EmbeddingBackend, EmbeddingConfig } from './types.js';
 import { chunkArray } from './types.js';
 import { fetchWithRetry } from './retry.js';
 
-/** Default batch size for Ollama (texts per batch request) */
-const DEFAULT_BATCH_SIZE = 10;
+/** Default batch size for Ollama (texts per request) */
+const DEFAULT_BATCH_SIZE = 50;
 
 /** Default concurrency for Ollama (parallel batch requests) */
-const DEFAULT_CONCURRENCY = 4;
+const DEFAULT_CONCURRENCY = 20;
 
-/** Default timeout for embedding requests (2 minutes per batch) */
-const DEFAULT_TIMEOUT_MS = 2 * 60 * 1000;
+/** Default timeout for embedding requests (5 minutes per batch) */
+const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
 /** Default Ollama model optimized for code search */
 export const DEFAULT_OLLAMA_MODEL = 'qwen3-embedding:0.6b';
