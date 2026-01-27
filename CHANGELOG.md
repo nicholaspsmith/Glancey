@@ -1,3 +1,10 @@
+## [1.17.1](https://github.com/nicholaspsmith/lance-context/compare/v1.17.0...v1.17.1) (2026-01-27)
+
+
+### Bug Fixes
+
+* pass correct batchSize and concurrency to embedding backend ([83c349e](https://github.com/nicholaspsmith/lance-context/commit/83c349e67774ee28503fefa04c60b343099ba95b))
+
 # [1.17.0](https://github.com/nicholaspsmith/lance-context/compare/v1.16.0...v1.17.0) (2026-01-27)
 
 
