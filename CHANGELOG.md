@@ -1,3 +1,10 @@
+# [1.23.0](https://github.com/nicholaspsmith/lance-context/compare/v1.22.1...v1.23.0) (2026-01-28)
+
+
+### Features
+
+* show batch completion progress in dashboard text ([#92](https://github.com/nicholaspsmith/lance-context/issues/92)) ([42c0e93](https://github.com/nicholaspsmith/lance-context/commit/42c0e93dfca004eb575c0c1b3601cacc1fe0c8ff))
+
 ## [1.22.1](https://github.com/nicholaspsmith/lance-context/compare/v1.22.0...v1.22.1) (2026-01-28)
 
 
