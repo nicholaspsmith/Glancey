@@ -1,7 +1,7 @@
 import type { EmbeddingBackend, EmbeddingConfig } from './types.js';
 import { chunkArray } from './types.js';
 import { fetchWithRetry } from './retry.js';
-import { broadcastLog } from '../dashboard/events.js';
+import { broadcastLog, updateProgressMessage } from '../dashboard/events.js';
 
 /** Default batch size for Ollama (texts per request) */
 const DEFAULT_BATCH_SIZE = 50;
@@ -111,14 +111,21 @@ export class OllamaBackend implements EmbeddingBackend {
       const groupNum = Math.floor(i / this.concurrency) + 1;
       const groupStart = Date.now();
 
-      const groupStartMsg = `Ollama: starting group ${groupNum}/${totalGroups} (${batchGroup.length} batches)...`;
+      const groupStartMsg = `Embedding group ${groupNum}/${totalGroups} (${batchGroup.length} batches)...`;
       console.error(`[lance-context] ${groupStartMsg}`);
       broadcastLog('info', groupStartMsg);
+      updateProgressMessage(groupStartMsg);
 
       const batchPromises = batchGroup.map(async (batch, groupIndex) => {
+        const batchNum = i + groupIndex + 1;
+        const batchStartMsg = `  Batch ${batchNum}/${batches.length}: sending ${batch.length} texts...`;
+        console.error(`[lance-context] ${batchStartMsg}`);
+        broadcastLog('info', batchStartMsg);
+
         // Create abort controller with timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+        const batchStart = Date.now();
 
         try {
           const response = await fetchWithRetry(`${this.baseUrl}/api/embed`, {
@@ -137,6 +144,10 @@ export class OllamaBackend implements EmbeddingBackend {
           }
 
           const data = (await response.json()) as { embeddings: number[][] };
+          const batchElapsed = ((Date.now() - batchStart) / 1000).toFixed(1);
+          const batchDoneMsg = `  Batch ${batchNum}/${batches.length}: done in ${batchElapsed}s`;
+          console.error(`[lance-context] ${batchDoneMsg}`);
+          broadcastLog('info', batchDoneMsg);
           return { batchIndex: i + groupIndex, embeddings: data.embeddings };
         } finally {
           clearTimeout(timeoutId);
