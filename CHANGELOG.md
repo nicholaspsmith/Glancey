@@ -1,3 +1,11 @@
+## [1.24.1](https://github.com/nicholaspsmith/lance-context/compare/v1.24.0...v1.24.1) (2026-01-28)
+
+
+### Bug Fixes
+
+* add diagnostic logging for dashboard browser opening ([#96](https://github.com/nicholaspsmith/lance-context/issues/96)) ([3820634](https://github.com/nicholaspsmith/lance-context/commit/382063429ca779142789d93dc7435f2c50807118))
+* preserve newlines in progress text display ([#97](https://github.com/nicholaspsmith/lance-context/issues/97)) ([9f9b301](https://github.com/nicholaspsmith/lance-context/commit/9f9b30122354402c2135d54bcdeee6ddb3c3580b))
+
 # [1.24.0](https://github.com/nicholaspsmith/lance-context/compare/v1.23.1...v1.24.0) (2026-01-28)
 
 
