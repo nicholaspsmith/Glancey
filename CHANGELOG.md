@@ -1,3 +1,10 @@
+# [1.20.0](https://github.com/nicholaspsmith/lance-context/compare/v1.19.0...v1.20.0) (2026-01-28)
+
+
+### Features
+
+* add browser console logging to dashboard ([#88](https://github.com/nicholaspsmith/lance-context/issues/88)) ([1ad412b](https://github.com/nicholaspsmith/lance-context/commit/1ad412b50c5a34b33df5d545dab49af5ec91f84c))
+
 # [1.19.0](https://github.com/nicholaspsmith/lance-context/compare/v1.18.6...v1.19.0) (2026-01-27)
 
 
