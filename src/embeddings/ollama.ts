@@ -6,8 +6,8 @@ import { broadcastLog, updateProgressMessage } from '../dashboard/events.js';
 /** Default batch size for Ollama (texts per request) */
 const DEFAULT_BATCH_SIZE = 50;
 
-/** Default concurrency for Ollama (parallel batch requests) */
-const DEFAULT_CONCURRENCY = 2;
+/** Default concurrency for Ollama (sequential - Ollama processes one at a time anyway) */
+const DEFAULT_CONCURRENCY = 1;
 
 /** Default timeout for embedding requests (2 minutes per batch) */
 const DEFAULT_TIMEOUT_MS = 2 * 60 * 1000;
@@ -111,6 +111,18 @@ export class OllamaBackend implements EmbeddingBackend {
       const groupNum = Math.floor(i / this.concurrency) + 1;
       const groupStart = Date.now();
 
+      // Track batch statuses for this group
+      const batchStatuses = new Map<number, string>();
+
+      const updateBatchProgress = () => {
+        const statusParts: string[] = [];
+        for (const [batchNum, status] of batchStatuses) {
+          statusParts.push(`#${batchNum}: ${status}`);
+        }
+        const progressMsg = `Group ${groupNum}/${totalGroups} | ${statusParts.join(' | ')}`;
+        updateProgressMessage(progressMsg);
+      };
+
       const groupStartMsg = `Embedding group ${groupNum}/${totalGroups} (${batchGroup.length} batches)...`;
       console.error(`[lance-context] ${groupStartMsg}`);
       broadcastLog('info', groupStartMsg);
@@ -118,14 +130,25 @@ export class OllamaBackend implements EmbeddingBackend {
 
       const batchPromises = batchGroup.map(async (batch, groupIndex) => {
         const batchNum = i + groupIndex + 1;
+
+        // Mark batch as running
+        batchStatuses.set(batchNum, 'running...');
+        updateBatchProgress();
+
         const batchStartMsg = `Batch ${batchNum}/${batches.length}: sending ${batch.length} texts...`;
         console.error(`[lance-context]   ${batchStartMsg}`);
         broadcastLog('info', batchStartMsg);
-        updateProgressMessage(batchStartMsg);
 
         // Create abort controller with timeout
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+        const timeoutId = setTimeout(() => {
+          const timeoutMsg = `Batch ${batchNum}/${batches.length}: TIMEOUT after ${DEFAULT_TIMEOUT_MS / 1000}s`;
+          console.error(`[lance-context]   ${timeoutMsg}`);
+          broadcastLog('error', timeoutMsg);
+          batchStatuses.set(batchNum, 'TIMEOUT');
+          updateBatchProgress();
+          controller.abort();
+        }, DEFAULT_TIMEOUT_MS);
         const batchStart = Date.now();
 
         try {
@@ -146,11 +169,23 @@ export class OllamaBackend implements EmbeddingBackend {
 
           const data = (await response.json()) as { embeddings: number[][] };
           const batchElapsed = ((Date.now() - batchStart) / 1000).toFixed(1);
+
+          // Mark batch as done
+          batchStatuses.set(batchNum, `done (${batchElapsed}s)`);
+          updateBatchProgress();
+
           const batchDoneMsg = `Batch ${batchNum}/${batches.length}: done in ${batchElapsed}s`;
           console.error(`[lance-context]   ${batchDoneMsg}`);
           broadcastLog('info', batchDoneMsg);
-          updateProgressMessage(batchDoneMsg);
           return { batchIndex: i + groupIndex, embeddings: data.embeddings };
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          const batchErrorMsg = `Batch ${batchNum}/${batches.length}: ERROR - ${errorMsg}`;
+          console.error(`[lance-context]   ${batchErrorMsg}`);
+          broadcastLog('error', batchErrorMsg);
+          batchStatuses.set(batchNum, 'ERROR');
+          updateBatchProgress();
+          throw error;
         } finally {
           clearTimeout(timeoutId);
         }
