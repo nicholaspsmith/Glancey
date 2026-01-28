@@ -863,23 +863,32 @@ export function getDashboardHTML(): string {
           <div class="form-group" id="ollamaSettingsGroup">
             <label for="concurrencySelect">Ollama Concurrency</label>
             <select id="concurrencySelect" class="form-select">
-              <option value="10">10 (conservative)</option>
+              <option value="1" selected>1 (default)</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="5">5</option>
+              <option value="10">10</option>
               <option value="25">25</option>
               <option value="50">50</option>
-              <option value="100" selected>100 (default)</option>
-              <option value="150">150</option>
-              <option value="200">200 (maximum)</option>
+              <option value="100">100</option>
+              <option value="250">250</option>
+              <option value="500">500</option>
+              <option value="1000">1000</option>
             </select>
           </div>
           <div class="form-group" id="batchSizeGroup">
             <label for="batchSizeSelect">Batch Size</label>
             <select id="batchSizeSelect" class="form-select">
-              <option value="32">32 (conservative)</option>
+              <option value="32">32</option>
               <option value="64">64</option>
-              <option value="100">100</option>
-              <option value="200" selected>200 (default)</option>
-              <option value="500">500</option>
-              <option value="1000">1000 (maximum)</option>
+              <option value="128">128</option>
+              <option value="256" selected>256 (default)</option>
+              <option value="512">512</option>
+              <option value="1024">1024</option>
+              <option value="2048">2048</option>
+              <option value="4096">4096</option>
+              <option value="8192">8192</option>
+              <option value="16384">16384</option>
             </select>
           </div>
           <div class="form-group" id="apiKeyGroup" style="display: none;">
@@ -1089,7 +1098,7 @@ export function getDashboardHTML(): string {
     const saveStatus = document.getElementById('saveStatus');
 
     // Track saved settings to detect changes
-    let savedSettings = { backend: 'auto', ollamaConcurrency: '1', batchSize: '200' };
+    let savedSettings = { backend: 'auto', ollamaConcurrency: '1', batchSize: '256' };
 
     // Check if current form values differ from saved settings
     function hasSettingsChanged() {
@@ -1130,7 +1139,7 @@ export function getDashboardHTML(): string {
           const settings = await response.json();
           const backend = settings.backend || 'auto';
           const concurrency = String(settings.ollamaConcurrency || 1);
-          const batchSize = String(settings.batchSize || 200);
+          const batchSize = String(settings.batchSize || 256);
 
           // Update saved settings
           savedSettings = { backend, ollamaConcurrency: concurrency, batchSize };
