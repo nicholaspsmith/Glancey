@@ -1,3 +1,10 @@
+# [1.25.0](https://github.com/nicholaspsmith/lance-context/compare/v1.24.2...v1.25.0) (2026-01-28)
+
+
+### Features
+
+* zero-config Jina embeddings with expanded batch options ([#99](https://github.com/nicholaspsmith/lance-context/issues/99)) ([62b90d9](https://github.com/nicholaspsmith/lance-context/commit/62b90d9dca6eac45f6844f7530b5bb2fe1f693ae))
+
 ## [1.24.2](https://github.com/nicholaspsmith/lance-context/compare/v1.24.1...v1.24.2) (2026-01-28)
 
 
