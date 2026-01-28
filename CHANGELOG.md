@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/nicholaspsmith/lance-context/compare/v1.21.0...v1.22.0) (2026-01-28)
+
+
+### Features
+
+* show Ollama batch progress in dashboard progress text ([#90](https://github.com/nicholaspsmith/lance-context/issues/90)) ([0e9c37c](https://github.com/nicholaspsmith/lance-context/commit/0e9c37cc99b7dc7cd3e90743b90fb78df79b80d6))
+
 # [1.21.0](https://github.com/nicholaspsmith/lance-context/compare/v1.20.0...v1.21.0) (2026-01-28)
 
 
