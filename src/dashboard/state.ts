@@ -263,6 +263,17 @@ export class DashboardStateManager extends EventEmitter {
   }
 
   /**
+   * Update just the message portion of the current progress.
+   * Useful for sub-progress updates (e.g., Ollama batch progress).
+   */
+  updateProgressMessage(message: string): void {
+    if (this.lastProgress) {
+      this.lastProgress = { ...this.lastProgress, message };
+      this.emit('progress', this.lastProgress);
+    }
+  }
+
+  /**
    * Called when indexing completes
    */
   onIndexingComplete(result: { filesIndexed: number; chunksCreated: number }): void {

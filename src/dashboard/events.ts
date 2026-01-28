@@ -200,6 +200,15 @@ export function broadcastLog(level: 'info' | 'warn' | 'error', message: string):
 }
 
 /**
+ * Update the progress message displayed in the dashboard.
+ * This updates just the message text without changing the progress numbers.
+ * Useful for showing sub-progress (e.g., Ollama batch progress).
+ */
+export function updateProgressMessage(message: string): void {
+  dashboardState.updateProgressMessage(message);
+}
+
+/**
  * Singleton instance of the SSE manager
  */
 export const sseManager = new SSEManager();
