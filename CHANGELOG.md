@@ -1,3 +1,10 @@
+## [1.26.1](https://github.com/nicholaspsmith/lance-context/compare/v1.26.0...v1.26.1) (2026-01-28)
+
+
+### Bug Fixes
+
+* allow gemini in backend validation ([#102](https://github.com/nicholaspsmith/lance-context/issues/102)) ([31aadae](https://github.com/nicholaspsmith/lance-context/commit/31aadaefc585cdef3ac31777acbee796b2c016b1))
+
 # [1.26.0](https://github.com/nicholaspsmith/lance-context/compare/v1.25.1...v1.26.0) (2026-01-28)
 
 
