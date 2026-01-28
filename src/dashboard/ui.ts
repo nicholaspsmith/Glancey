@@ -855,9 +855,8 @@ export function getDashboardHTML(): string {
           <div class="form-group">
             <label for="backendSelect">Select Backend</label>
             <select id="backendSelect" class="form-select">
-              <option value="auto">Auto (detect available)</option>
-              <option value="jina">Jina AI (cloud)</option>
-              <option value="ollama">Ollama (local)</option>
+              <option value="jina" selected>Jina AI (default - no setup required)</option>
+              <option value="ollama">Ollama (local - requires install)</option>
             </select>
           </div>
           <div class="form-group" id="ollamaSettingsGroup">
@@ -1098,7 +1097,7 @@ export function getDashboardHTML(): string {
     const saveStatus = document.getElementById('saveStatus');
 
     // Track saved settings to detect changes
-    let savedSettings = { backend: 'auto', ollamaConcurrency: '1', batchSize: '256' };
+    let savedSettings = { backend: 'jina', ollamaConcurrency: '1', batchSize: '256' };
 
     // Check if current form values differ from saved settings
     function hasSettingsChanged() {
@@ -1137,7 +1136,7 @@ export function getDashboardHTML(): string {
         const response = await fetch('/api/settings/embedding');
         if (response.ok) {
           const settings = await response.json();
-          const backend = settings.backend || 'auto';
+          const backend = settings.backend || 'jina';
           const concurrency = String(settings.ollamaConcurrency || 1);
           const batchSize = String(settings.batchSize || 256);
 
@@ -1152,15 +1151,15 @@ export function getDashboardHTML(): string {
           updateSaveButtonVisibility();
 
           // Update status badge
-          if (settings.hasApiKey) {
-            embeddingStatus.textContent = 'API Key Set';
-            embeddingStatus.className = 'badge success';
-          } else if (settings.backend === 'ollama') {
+          if (settings.backend === 'ollama') {
             embeddingStatus.textContent = 'Local';
             embeddingStatus.className = 'badge';
+          } else if (settings.hasApiKey) {
+            embeddingStatus.textContent = 'Custom Key';
+            embeddingStatus.className = 'badge success';
           } else {
-            embeddingStatus.textContent = 'Not Configured';
-            embeddingStatus.className = 'badge warning';
+            embeddingStatus.textContent = 'Ready';
+            embeddingStatus.className = 'badge success';
           }
         }
       } catch (error) {
@@ -1188,7 +1187,7 @@ export function getDashboardHTML(): string {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            backend: backend === 'auto' ? 'ollama' : backend,
+            backend,
             apiKey: backend === 'jina' ? apiKey : undefined,
             ollamaConcurrency: parseInt(concurrencySelect.value, 10),
             batchSize: parseInt(batchSizeSelect.value, 10)
