@@ -1,3 +1,10 @@
+## [1.29.3](https://github.com/nicholaspsmith/lance-context/compare/v1.29.2...v1.29.3) (2026-01-29)
+
+
+### Bug Fixes
+
+* resolve project path and add force option to open_dashboard ([#114](https://github.com/nicholaspsmith/lance-context/issues/114)) ([6f74347](https://github.com/nicholaspsmith/lance-context/commit/6f7434794dc5c198303f4e772b5f763b4c4cd594))
+
 ## [1.29.2](https://github.com/nicholaspsmith/lance-context/compare/v1.29.1...v1.29.2) (2026-01-29)
 
 
