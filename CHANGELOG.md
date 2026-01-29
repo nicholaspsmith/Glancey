@@ -1,3 +1,10 @@
+## [1.28.1](https://github.com/nicholaspsmith/lance-context/compare/v1.28.0...v1.28.1) (2026-01-29)
+
+
+### Bug Fixes
+
+* add detailed logging for Gemini API requests ([#109](https://github.com/nicholaspsmith/lance-context/issues/109)) ([a469de8](https://github.com/nicholaspsmith/lance-context/commit/a469de881e2ca395c7754b12fc23d245a93f5419))
+
 # [1.28.0](https://github.com/nicholaspsmith/lance-context/compare/v1.27.3...v1.28.0) (2026-01-29)
 
 
