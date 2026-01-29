@@ -1,3 +1,10 @@
+## [1.29.5](https://github.com/nicholaspsmith/lance-context/compare/v1.29.4...v1.29.5) (2026-01-29)
+
+
+### Bug Fixes
+
+* update dashboard logo to new robot design ([#116](https://github.com/nicholaspsmith/lance-context/issues/116)) ([c0d4b20](https://github.com/nicholaspsmith/lance-context/commit/c0d4b203dfc98ef38ee7f468433d5f7bf2fbd8ba))
+
 ## [1.29.4](https://github.com/nicholaspsmith/lance-context/compare/v1.29.3...v1.29.4) (2026-01-29)
 
 
