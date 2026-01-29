@@ -1,3 +1,10 @@
+## [1.27.3](https://github.com/nicholaspsmith/lance-context/compare/v1.27.2...v1.27.3) (2026-01-29)
+
+
+### Bug Fixes
+
+* add 60-second timeout to embedding API requests ([#107](https://github.com/nicholaspsmith/lance-context/issues/107)) ([0f96f92](https://github.com/nicholaspsmith/lance-context/commit/0f96f92aac6b47fb3057db6511d0fbbb61e386e2))
+
 ## [1.27.2](https://github.com/nicholaspsmith/lance-context/compare/v1.27.1...v1.27.2) (2026-01-29)
 
 
