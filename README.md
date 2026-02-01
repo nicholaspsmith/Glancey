@@ -16,11 +16,38 @@ An MCP plugin that adds semantic code search to Claude Code and other AI coding 
 ## Features
 
 - **Semantic Code Search**: Natural language queries locate relevant code across your entire codebase
+- **Token Savings**: Dramatically reduces context usage by returning only relevant code chunks
 - **Multiple Embedding Backends**: Google Gemini (free) or Ollama (local)
 - **LanceDB Vector Storage**: Fast, efficient vector search with hybrid BM25 + dense matching
 - **MCP Compatible**: Works with Claude Code, Cursor, and other MCP-compatible tools
-- **Web Dashboard**: Real-time monitoring of index status, configuration, and usage statistics
+- **Web Dashboard**: Real-time monitoring of index status, token savings, and usage statistics
 - **Beads Integration**: Shows issue tracker data if your project uses [beads](https://github.com/steveyegge/beads)
+
+## How lance-context Saves Tokens
+
+AI coding agents typically need to read entire files to understand your codebase, which consumes significant context tokens. lance-context dramatically reduces token usage by:
+
+| Without lance-context | With lance-context | Savings |
+|-----------------------|-------------------|---------|
+| Read 5-10 files to find auth code (~5000 lines) | `search_code` returns 3 chunks (~150 lines) | ~97% |
+| Read entire file to understand structure | `get_symbols_overview` returns compact list | ~80-90% |
+| Explore many files to understand codebase | `summarize_codebase` + `list_concepts` | ~95% |
+| Read and compare files for duplicates | `search_similar` returns targeted results | ~90% |
+
+### Token Savings Dashboard
+
+The web dashboard displays real-time token savings statistics:
+- **Estimated Tokens Saved**: Total tokens avoided by using semantic search
+- **Efficiency**: Percentage of potential tokens saved
+- **Files Not Read**: Count of files skipped due to targeted search
+- **Operations Tracked**: Number of search operations contributing to savings
+
+### How It Works
+
+1. **Chunking**: Your codebase is split into semantic chunks (functions, classes, etc.)
+2. **Embedding**: Each chunk is converted to a vector embedding
+3. **Search**: Queries find only the most relevant chunks, not entire files
+4. **Return**: Only the matching chunks are sent to the AI, saving context tokens
 
 ## Installation
 
