@@ -1,3 +1,10 @@
+# [1.33.0](https://github.com/nicholaspsmith/lance-context/compare/v1.32.0...v1.33.0) (2026-02-01)
+
+
+### Features
+
+* auto-fallback to Ollama when embedding backend fails ([#120](https://github.com/nicholaspsmith/lance-context/issues/120)) ([33ac2c8](https://github.com/nicholaspsmith/lance-context/commit/33ac2c8348f7b3c60027e673bef40bf2fc4d7f8a))
+
 # [1.32.0](https://github.com/nicholaspsmith/lance-context/compare/v1.31.0...v1.32.0) (2026-02-01)
 
 
