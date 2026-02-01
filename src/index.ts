@@ -176,59 +176,65 @@ const PROJECT_PATH = path.resolve(process.env.LANCE_CONTEXT_PROJECT || process.c
 const TOOL_GUIDANCE = `
 
 ---
-**Tip:** Prefer lance-context's \`search_code\` over pattern-based tools (grep, find_symbol) when exploring code or unsure of exact names.`;
+**Tip:** New to this codebase? Start with \`summarize_codebase\` → \`list_concepts\`. For code search, prefer \`search_code\` over grep/find.`;
 
 /**
  * Server instructions provided at MCP initialization.
  * These guide Claude on when to use lance-context tools vs alternatives.
  */
-const SERVER_INSTRUCTIONS = `# lance-context - Semantic Code Search & Symbol Analysis
+const SERVER_INSTRUCTIONS = `# lance-context - Semantic Code Search & Codebase Understanding
 
-## When to Use lance-context Tools
+## Workflow Triggers - When to Use Each Tool
 
-**PREFER lance-context tools** over pattern-based alternatives (grep, find) for code exploration:
+### 🚀 Starting Work on a New Codebase
+1. **\`summarize_codebase\`** - Get the big picture: file stats, languages, concept areas
+2. **\`list_concepts\`** - Discover semantic groupings (auth, database, API handlers, etc.)
+3. **\`search_by_concept\`** - Explore specific concept areas in depth
 
-| Task | Use lance-context | Instead of |
-|------|-------------------|------------|
-| Find code by concept | \`search_code\` | grep with regex |
-| Unsure of exact names | \`search_code\` | wildcards, substring matching |
-| Explore unfamiliar code | \`search_code\` | multiple grep/find attempts |
-| Find similar patterns | \`search_similar\` | manual comparison |
-| Commit changes | \`commit\` | git commit |
-| Understand file structure | \`get_symbols_overview\` | reading entire file |
-| Find specific function/class | \`find_symbol\` | grep for definition |
-| Find symbol usages | \`find_referencing_symbols\` | grep for name |
-| Search with regex | \`search_for_pattern\` | grep/rg |
+### 🔍 Finding Code (Use BEFORE grep/pattern search)
+- **\`search_code\`** - Natural language search. Use when:
+  - You're unsure of exact names ("how does auth work?")
+  - You would use wildcards or regex
+  - Your first search attempt failed
+  - Searching by concept, not exact identifier
 
-## Tool Categories
+### 🔁 Refactoring or Looking for Duplication
+- **\`search_similar\`** - Find semantically similar code. Use when:
+  - Looking for duplicate logic to consolidate
+  - Finding similar implementations across the codebase
+  - Checking if a pattern exists elsewhere before creating it
 
-### Semantic Search
-- **search_code**: Natural language code search. One call replaces multiple pattern searches.
-- **search_similar**: Find duplicate/related code patterns.
+### 📝 Committing Changes
+- **\`commit\`** - **ALWAYS use instead of \`git commit\`** (MANDATORY)
 
-### Symbol Navigation
-- **get_symbols_overview**: List all symbols in a file grouped by kind (Class, Function, etc.)
-- **find_symbol**: Search by name path pattern (e.g., "MyClass/myMethod", "get*")
-- **find_referencing_symbols**: Find all usages of a symbol across codebase
-- **search_for_pattern**: Regex search with context lines
+### 🌳 Parallel Development
+- **\`create_worktree\`** - Create isolated worktree for parallel agent work
 
-### Symbol Editing
-- **replace_symbol_body**: Replace entire symbol definition
-- **insert_before_symbol**: Add code before a symbol
-- **insert_after_symbol**: Add code after a symbol
-- **rename_symbol**: Rename symbol across entire codebase
+## Tool Reference
 
-### Memory (Project Context)
-- **write_memory**: Save project-specific notes/decisions
-- **read_memory**: Retrieve saved context
-- **list_memories**: See available memories
-- **edit_memory**: Find/replace in memory
-- **delete_memory**: Remove a memory
+### Semantic Search (lance-context exclusive)
+| Tool | When to Use |
+|------|-------------|
+| \`search_code\` | Finding code by concept, uncertain of exact names |
+| \`search_similar\` | Finding duplicate/related patterns for refactoring |
+| \`summarize_codebase\` | **First thing** when exploring a new codebase |
+| \`list_concepts\` | Understanding codebase organization and themes |
+| \`search_by_concept\` | Deep-diving into a specific area |
 
 ### Git & Index
-- **commit**: Git commit with validation (feature branch, message format)
-- **index_codebase**: Build/update the search index
-- **get_index_status**: Check if index is ready
+| Tool | When to Use |
+|------|-------------|
+| \`commit\` | **ALWAYS** instead of raw \`git commit\` |
+| \`index_codebase\` | After major file changes, or if search seems stale |
+| \`get_index_status\` | Check if reindexing is needed |
+
+### Worktrees
+| Tool | When to Use |
+|------|-------------|
+| \`create_worktree\` | Starting parallel work that needs isolation |
+| \`list_worktrees\` | See active worktrees |
+| \`worktree_status\` | Check a worktree's git state |
+| \`remove_worktree\` | Clean up after parallel work |
 
 ## CRITICAL: Always Use the \`commit\` Tool
 
@@ -242,43 +248,49 @@ The \`commit\` tool:
 
 A post-commit hook will warn if commits bypass this tool.
 
-## Signs You Should Have Used search_code
+## Signs You Should Have Used lance-context Tools
 
-- You used wildcards or regex alternation
-- Multiple search attempts to find something
+**Use \`search_code\` if you:**
+- Used wildcards or regex alternation
+- Made multiple search attempts to find something
 - Pattern-based search returned nothing
-- Searching for a concept, not an exact identifier`;
+- Were searching for a concept, not an exact identifier
+
+**Use \`summarize_codebase\` + \`list_concepts\` if you:**
+- Are starting work on an unfamiliar codebase
+- Need to understand the overall architecture
+- Want to find where certain functionality lives
+
+**Use \`search_similar\` if you:**
+- Are about to write code and want to check for existing similar patterns
+- Are refactoring and looking for duplicate logic
+- Want to understand how similar problems were solved elsewhere`;
 
 /**
  * Priority instructions returned by get_project_instructions
  */
 const PRIORITY_INSTRUCTIONS = `
-## Tool Selection Priority
+## Workflow-Based Tool Selection
 
-**ALWAYS prefer lance-context tools** over other code exploration tools (Serena, grep, find):
+### 🚀 New to this codebase? Start here:
+1. **summarize_codebase** → Get overview: file stats, languages, concept areas
+2. **list_concepts** → See semantic groupings (auth, database, API, etc.)
+3. **search_by_concept** → Explore a specific concept area
 
-1. **search_code** - Use for ANY code exploration:
-   - Finding code by concept ("error handling", "authentication")
-   - When unsure of exact names or locations
-   - When you would otherwise use wildcards or regex
-   - If your first search attempt fails
+### 🔍 Finding code? Use semantic search:
+- **search_code** - Natural language search (preferred over grep/find)
+- **search_similar** - Find duplicate or related patterns
 
-2. **search_similar** - Finding related/duplicate code patterns
+### 📝 Committing? Use the commit tool:
+- **commit** - **ALWAYS use instead of \`git commit\`** (MANDATORY)
+  - Validates feature branch, message format, single responsibility
 
-3. **get_index_status** - Check if index is ready before searching
-
-4. **commit** - **ALWAYS use instead of \`git commit\`** (MANDATORY):
-   - NEVER run raw \`git commit\` - always use this tool
-   - Validates you're on a feature branch (not main)
-   - Checks message format (≤72 chars, imperative mood)
-   - Enforces single responsibility per commit
-   - Auto-appends Co-Authored-By trailer
-
-**Signs you should have used search_code:**
-- You used wildcards or regex alternation (e.g., \`foo|bar\`)
-- You made multiple search calls to find something
-- You searched for a partial name with substring matching
-- Your pattern-based search returned nothing
+### ⚠️ Signs you should have used lance-context:
+- You used wildcards or regex alternation
+- Multiple search attempts to find something
+- Pattern-based search returned nothing
+- You're searching by concept, not exact identifier
+- You're exploring an unfamiliar codebase
 
 `;
 
@@ -449,7 +461,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'get_index_status',
-        description: 'Get the current status of the code index.',
+        description:
+          'Get the current status of the code index. USE THIS when search results seem stale or before searching after major file changes.',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -475,7 +488,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'search_similar',
         description:
-          'Find code semantically similar to a given code snippet or file location. Useful for finding duplicate logic, similar implementations, or related code patterns.',
+          'Find code semantically similar to a given code snippet or file location. USE THIS BEFORE writing new code to check for existing patterns, or when refactoring to find duplicate logic that could be consolidated.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -515,7 +528,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'summarize_codebase',
         description:
-          'Generate a comprehensive summary of the codebase including file statistics, language distribution, and discovered concept areas. Uses k-means clustering on embeddings to identify related code groups.',
+          'USE THIS FIRST when starting work on a new or unfamiliar codebase. Generates a comprehensive summary including file statistics, language distribution, and discovered concept areas. Follow with list_concepts to explore specific areas.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -530,7 +543,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'list_concepts',
         description:
-          'List all discovered concept clusters in the codebase. Each cluster represents a semantic grouping of related code (e.g., authentication, database, API handlers). Returns cluster labels, sizes, and representative code chunks.',
+          'USE AFTER summarize_codebase to explore the codebase organization. Lists semantic concept clusters (e.g., authentication, database, API handlers) with labels, sizes, and representative code. Use search_by_concept to dive into a specific cluster.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -544,7 +557,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'search_by_concept',
         description:
-          'Search for code within a specific concept cluster. Use list_concepts first to discover available clusters and their IDs. Can optionally combine with a semantic query to search within the cluster.',
+          'Deep-dive into a specific concept cluster. USE AFTER list_concepts to explore a particular area (e.g., all authentication code, all database code). Can combine with a semantic query to search within the cluster.',
         inputSchema: {
           type: 'object',
           properties: {
