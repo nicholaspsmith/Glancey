@@ -1,3 +1,10 @@
+## [1.33.1](https://github.com/nicholaspsmith/lance-context/compare/v1.33.0...v1.33.1) (2026-02-01)
+
+
+### Bug Fixes
+
+* pass timeout to fetchWithRetry for Ollama backend ([#121](https://github.com/nicholaspsmith/lance-context/issues/121)) ([7dfad8a](https://github.com/nicholaspsmith/lance-context/commit/7dfad8a6ece76716583c050ede57916065eee884))
+
 # [1.33.0](https://github.com/nicholaspsmith/lance-context/compare/v1.32.0...v1.33.0) (2026-02-01)
 
 
