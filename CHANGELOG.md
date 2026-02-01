@@ -1,3 +1,10 @@
+# [1.31.0](https://github.com/nicholaspsmith/lance-context/compare/v1.30.0...v1.31.0) (2026-02-01)
+
+
+### Features
+
+* change default embedding backend to ollama and fix dashboard logo ([bd33e01](https://github.com/nicholaspsmith/lance-context/commit/bd33e0115f167bbfc30e4f7a77be24902fa4b1f5))
+
 # [1.30.0](https://github.com/nicholaspsmith/lance-context/compare/v1.29.5...v1.30.0) (2026-01-30)
 
 
