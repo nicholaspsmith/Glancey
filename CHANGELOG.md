@@ -1,3 +1,10 @@
+# [1.34.0](https://github.com/nicholaspsmith/lance-context/compare/v1.33.1...v1.34.0) (2026-02-01)
+
+
+### Features
+
+* add local config and set ollama as default backend ([#122](https://github.com/nicholaspsmith/lance-context/issues/122)) ([ac2b5e0](https://github.com/nicholaspsmith/lance-context/commit/ac2b5e05a09adfe39b48f8ed0656a33364b16417))
+
 ## [1.33.1](https://github.com/nicholaspsmith/lance-context/compare/v1.33.0...v1.33.1) (2026-02-01)
 
 
