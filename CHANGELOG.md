@@ -1,3 +1,10 @@
+## [1.36.2](https://github.com/nicholaspsmith/lance-context/compare/v1.36.1...v1.36.2) (2026-02-02)
+
+
+### Bug Fixes
+
+* correctly show Ollama fallback state in dashboard ([#126](https://github.com/nicholaspsmith/lance-context/issues/126)) ([5f12d37](https://github.com/nicholaspsmith/lance-context/commit/5f12d3735d2c0f613e428d910c41b52e65562d80))
+
 ## [1.36.1](https://github.com/nicholaspsmith/lance-context/compare/v1.36.0...v1.36.1) (2026-02-02)
 
 
