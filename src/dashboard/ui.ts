@@ -844,7 +844,6 @@ export function getDashboardHTML(): string {
     .beads-stats {
       display: flex;
       gap: 24px;
-      margin-bottom: 16px;
     }
 
     .beads-stat {
@@ -937,7 +936,6 @@ export function getDashboardHTML(): string {
       gap: 8px;
       font-size: 12px;
       color: var(--text-secondary);
-      margin-top: 12px;
     }
 
     .beads-empty {
@@ -1354,6 +1352,10 @@ export function getDashboardHTML(): string {
             <span class="badge success" id="beadsBadge" style="display: none;">Active</span>
           </div>
           <div class="beads-header-right" id="beadsHeaderStats" style="display: none;">
+            <div class="beads-daemon-status" id="beadsDaemonStatus">
+              <div class="status-dot" id="beadsDaemonDot"></div>
+              <span id="beadsDaemonText">Daemon status unknown</span>
+            </div>
             <div class="beads-stats">
               <div class="beads-stat">
                 <span class="beads-stat-value" id="beadsReadyCount">0</span>
@@ -1368,15 +1370,11 @@ export function getDashboardHTML(): string {
                 <span class="beads-stat-label">Total</span>
               </div>
             </div>
-            <div class="beads-daemon-status" id="beadsDaemonStatus">
-              <div class="status-dot" id="beadsDaemonDot"></div>
-              <span id="beadsDaemonText">Daemon status unknown</span>
-            </div>
           </div>
         </div>
         <div id="beadsUnavailable" class="beads-unavailable">
           <p>Beads is not configured for this project.</p>
-          <p style="margin-top: 8px; font-size: 13px;">Visit <a href="https://github.com/nicholaspsmith/beads" target="_blank" style="color: var(--accent-blue);">github.com/nicholaspsmith/beads</a> to learn more.</p>
+          <p style="margin-top: 8px; font-size: 13px;">Visit <a href="https://github.com/steveyegge/beads" target="_blank" style="color: var(--accent-blue);">github.com/steveyegge/beads</a> to learn more.</p>
         </div>
         <div id="beadsContent" style="display: none;">
           <div class="card">
