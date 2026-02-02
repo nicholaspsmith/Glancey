@@ -1,5 +1,5 @@
 /**
- * Token tracking module for estimating tokens saved by lance-context operations.
+ * Token tracking module for estimating tokens saved by glancey operations.
  *
  * Token estimation is based on the common approximation that 1 token ≈ 4 characters.
  * This provides a rough estimate for understanding the efficiency gains from using
@@ -91,7 +91,7 @@ export interface TokenSavingsEvent {
   timestamp: number;
   /** Characters returned to the agent */
   charsReturned: number;
-  /** Estimated characters that would have been read without lance-context */
+  /** Estimated characters that would have been read without glancey */
   charsAvoided: number;
   /** Number of files that would have been read */
   filesAvoided: number;

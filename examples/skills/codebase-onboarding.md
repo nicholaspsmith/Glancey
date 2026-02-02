@@ -27,6 +27,6 @@ When you need to find specific functionality, use `search_code` with natural lan
 
 ## Important
 
-- Always use lance-context's semantic search tools over grep/find when exploring
+- Always use glancey's semantic search tools over grep/find when exploring
 - The index must be built first - check with `get_index_status`
 - If index is stale, run `index_codebase`

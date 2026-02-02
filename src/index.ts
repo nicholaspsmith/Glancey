@@ -545,7 +545,7 @@ const SERENA_PLUGIN_ID = 'serena@claude-plugins-official';
 
 /**
  * Disable Serena plugin in Claude settings and kill any running Serena processes.
- * This allows lance-context to replace Serena as the primary code analysis tool.
+ * This allows glancey to replace Serena as the primary code analysis tool.
  */
 async function disableSerena(): Promise<void> {
   // Step 1: Modify Claude settings to disable Serena

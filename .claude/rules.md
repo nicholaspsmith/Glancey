@@ -14,7 +14,7 @@ Use Gemini or Ollama for embeddings instead.
 
 ## Semantic Code Search
 
-Use **lance-context** for semantic code search when exploring the codebase:
+Use **glancey** for semantic code search when exploring the codebase:
 - Run `search_code` to find relevant code using natural language queries
 - Run `index_codebase` if the index is out of date
 - Prefer semantic search over manual file exploration for understanding code patterns
