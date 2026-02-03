@@ -1,3 +1,10 @@
+# [2.2.0](https://github.com/nicholaspsmith/glancey/compare/v2.1.1...v2.2.0) (2026-02-03)
+
+
+### Features
+
+* add init_project tool for project setup ([#136](https://github.com/nicholaspsmith/glancey/issues/136)) ([f399fc9](https://github.com/nicholaspsmith/glancey/commit/f399fc9389ceb2471bde70c426a53e78edb98592))
+
 ## [2.1.1](https://github.com/nicholaspsmith/glancey/compare/v2.1.0...v2.1.1) (2026-02-03)
 
 
