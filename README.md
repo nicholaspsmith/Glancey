@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" alt="glancey logo" width="150" height="150">
+  <img src="logo.png" alt="Glancey logo" width="150" height="150">
 </p>
 
 <p align="center">
@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg" alt="Node.js version">
 </p>
 
-# glancey
+# Glancey
 
 An MCP plugin that adds semantic code search to Claude Code and other AI coding agents, giving them deep context from your entire codebase.
 
@@ -23,37 +23,11 @@ An MCP plugin that adds semantic code search to Claude Code and other AI coding 
 - **Web Dashboard**: Real-time monitoring of index status, token savings, and usage statistics
 - **Beads Integration**: Shows issue tracker data if your project uses [beads](https://github.com/steveyegge/beads)
 
-## How glancey Saves Tokens
-
-AI coding agents typically need to read entire files to understand your codebase, which consumes significant context tokens. glancey dramatically reduces token usage by:
-
-| Without glancey | With glancey | Savings |
-|-----------------------|-------------------|---------|
-| Read 5-10 files to find auth code (~5000 lines) | `search_code` returns 3 chunks (~150 lines) | ~97% |
-| Read entire file to understand structure | `get_symbols_overview` returns compact list | ~80-90% |
-| Explore many files to understand codebase | `summarize_codebase` + `list_concepts` | ~95% |
-| Read and compare files for duplicates | `search_similar` returns targeted results | ~90% |
-
-### Token Savings Dashboard
-
-The web dashboard displays real-time token savings statistics:
-- **Estimated Tokens Saved**: Total tokens avoided by using semantic search
-- **Efficiency**: Percentage of potential tokens saved
-- **Files Not Read**: Count of files skipped due to targeted search
-- **Operations Tracked**: Number of search operations contributing to savings
-
-### How It Works
-
-1. **Chunking**: Your codebase is split into semantic chunks (functions, classes, etc.)
-2. **Embedding**: Each chunk is converted to a vector embedding
-3. **Search**: Queries find only the most relevant chunks, not entire files
-4. **Return**: Only the matching chunks are sent to the AI, saving context tokens
-
 ## Installation
 
 ### Quick Install (Recommended)
 
-Add glancey to Claude Code:
+Add Glancey to Claude Code:
 
 ```bash
 claude mcp add --scope user --transport stdio glancey -- npx -y glancey
@@ -69,7 +43,7 @@ For faster startup (no npm check on each run):
 npm install -g glancey
 ```
 
-This automatically registers glancey with Claude Code. Update manually with `npm update -g glancey`.
+This automatically registers Glancey with Claude Code. Update manually with `npm update -g glancey`.
 
 ### Manual Registration
 
@@ -81,18 +55,18 @@ claude mcp add --scope user --transport stdio glancey -- npx -y glancey@latest
 
 ### Verify Installation
 
-In Claude Code, run `/mcp` to see glancey in the list of MCP servers.
+In Claude Code, run `/mcp` to see Glancey in the list of MCP servers.
 
 ### Initialize Your Project (Recommended)
 
-After installing glancey, run `init_project` in your project to set up agent instructions:
+After installing Glancey, run `init_project` in your project to set up agent instructions:
 
 ```
 > init_project
 ```
 
 This creates:
-- **CLAUDE.md** - Instructions for AI agents on how to use glancey tools
+- **CLAUDE.md** - Instructions for AI agents on how to use Glancey tools
 - **Post-commit hook** - Warns when commits bypass the `commit` tool
 
 The hook is installed in `.husky/` if you use Husky, otherwise in `.git/hooks/`.
@@ -114,7 +88,7 @@ For project-specific MCP configuration, add a `.mcp.json` to your project root:
 
 ### Project Configuration
 
-Create a `.glancey.json` file in your project root to customize indexing behavior. All options are optional - glancey works out of the box with sensible defaults.
+Create a `.glancey.json` file in your project root to customize indexing behavior. All options are optional - Glancey works out of the box with sensible defaults.
 
 #### Minimal Configuration
 
@@ -174,7 +148,7 @@ For most projects, you only need to specify what to include:
 
 #### Default Behavior
 
-Without a `.glancey.json` file, glancey will:
+Without a `.glancey.json` file, Glancey will:
 
 - Index common source code files (TypeScript, JavaScript, Python, Go, Rust, Java, Ruby, PHP, C/C++, C#, Swift, Kotlin)
 - Exclude build artifacts, dependencies, and generated files
@@ -198,6 +172,32 @@ Set these environment variables to configure embedding backends:
 1. If `embedding.backend` is set in config, use that backend
 2. If `GEMINI_API_KEY` is set, use Gemini
 3. Fall back to Ollama (must be running locally)
+
+## How Glancey Saves Tokens
+
+AI coding agents typically need to read entire files to understand your codebase, which consumes significant context tokens. Glancey dramatically reduces token usage by:
+
+| Without Glancey | With Glancey | Savings |
+|-----------------------|-------------------|---------|
+| Read 5-10 files to find auth code (~5000 lines) | `search_code` returns 3 chunks (~150 lines) | ~97% |
+| Read entire file to understand structure | `get_symbols_overview` returns compact list | ~80-90% |
+| Explore many files to understand codebase | `summarize_codebase` + `list_concepts` | ~95% |
+| Read and compare files for duplicates | `search_similar` returns targeted results | ~90% |
+
+### Token Savings Dashboard
+
+The web dashboard displays real-time token savings statistics:
+- **Estimated Tokens Saved**: Total tokens avoided by using semantic search
+- **Efficiency**: Percentage of potential tokens saved
+- **Files Not Read**: Count of files skipped due to targeted search
+- **Operations Tracked**: Number of search operations contributing to savings
+
+### How It Works
+
+1. **Chunking**: Your codebase is split into semantic chunks (functions, classes, etc.)
+2. **Embedding**: Each chunk is converted to a vector embedding
+3. **Search**: Queries find only the most relevant chunks, not entire files
+4. **Return**: Only the matching chunks are sent to the AI, saving context tokens
 
 ## Architecture
 
@@ -227,7 +227,7 @@ Set these environment variables to configure embedding backends:
 
 ## Embedding Backend Setup
 
-glancey automatically selects the best available backend (in priority order):
+Glancey automatically selects the best available backend (in priority order):
 
 1. **Google Gemini** (if `GEMINI_API_KEY` is set, free tier available)
    ```bash
@@ -259,7 +259,7 @@ Ollama provides free, local embeddings with no API rate limits. Perfect for inde
    ollama run qwen3-embedding:0.6b "test"
    ```
 
-That's it! glancey will automatically use Ollama when no Gemini API key is set.
+That's it! Glancey will automatically use Ollama when no Gemini API key is set.
 
 #### Model Options
 
@@ -345,7 +345,7 @@ Use semantic search for exploring this codebase. Always run tests before committ
 
 ## Dashboard
 
-glancey includes a web dashboard for monitoring index status and usage.
+Glancey includes a web dashboard for monitoring index status and usage.
 
 ### Accessing the Dashboard
 

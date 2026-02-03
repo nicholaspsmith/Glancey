@@ -18,7 +18,7 @@ export function getDashboardHTML(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>glancey Dashboard</title>
+  <title>Glancey Dashboard</title>
   <link rel="icon" type="image/png" href="${FAVICON_PNG}">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/charts.css/dist/charts.min.css">
   <style>
@@ -1188,8 +1188,8 @@ export function getDashboardHTML(): string {
     <header>
       <div class="header-left">
         <h1>
-          <div class="logo"><img src="${LOGO_PNG}" alt="glancey logo" width="40" height="36"></div>
-          glancey
+          <div class="logo"><img src="${LOGO_PNG}" alt="Glancey logo" width="40" height="36"></div>
+          Glancey
           <span class="version-badge" id="versionBadge"></span>
         </h1>
         <div class="project-name" id="projectName"></div>
