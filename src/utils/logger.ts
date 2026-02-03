@@ -1,5 +1,5 @@
 /**
- * Structured logging utility for lance-context.
+ * Structured logging utility for glancey.
  *
  * Supports log levels (debug, info, warn, error) configured via environment variable.
  */

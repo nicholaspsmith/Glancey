@@ -3,7 +3,7 @@
 # Version: 6.0.0-alpha.22
 # Date: 2026-01-08T02:08:26.616Z
 
-project_name: lance-context
+project_name: glancey
 user_skill_level: intermediate
 planning_artifacts: "{project-root}/_bmad-output/planning-artifacts"
 implementation_artifacts: "{project-root}/_bmad-output/implementation-artifacts"

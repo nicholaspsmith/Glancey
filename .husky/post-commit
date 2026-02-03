@@ -9,7 +9,7 @@ if [ -f "$MARKER_FILE" ]; then
 else
   # Commit bypassed MCP tool - warn the user
   echo ""
-  echo "⚠️  WARNING: Commit made without using lance-context commit tool"
+  echo "⚠️  WARNING: Commit made without using glancey commit tool"
   echo ""
   echo "Always use the MCP 'commit' tool instead of raw 'git commit'."
   echo "The commit tool validates:"
@@ -17,6 +17,6 @@ else
   echo "  - Message format (≤72 chars, imperative mood)"
   echo "  - Single responsibility per commit"
   echo ""
-  echo "Example: mcp__lance-context__commit(message: \"feat: add feature\")"
+  echo "Example: mcp__glancey__commit(message: \"feat: add feature\")"
   echo ""
 fi
