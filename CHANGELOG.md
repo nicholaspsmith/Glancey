@@ -1,3 +1,10 @@
+## [2.2.1](https://github.com/nicholaspsmith/glancey/compare/v2.2.0...v2.2.1) (2026-02-03)
+
+
+### Bug Fixes
+
+* release on all commit types merged to main ([#139](https://github.com/nicholaspsmith/glancey/issues/139)) ([cc8d958](https://github.com/nicholaspsmith/glancey/commit/cc8d958b7570080b63ab5b74d72bc8c7d9e97ab1))
+
 # [2.2.0](https://github.com/nicholaspsmith/glancey/compare/v2.1.1...v2.2.0) (2026-02-03)
 
 
