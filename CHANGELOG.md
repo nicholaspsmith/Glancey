@@ -1,3 +1,11 @@
+## [Unreleased]
+
+
+### Features
+
+* add /glancey and /init_project slash commands via MCP prompts ([#143](https://github.com/nicholaspsmith/glancey/issues/143))
+* init_project now installs /glancey slash command into .claude/commands/
+
 ## [2.4.1](https://github.com/nicholaspsmith/glancey/compare/v2.4.0...v2.4.1) (2026-02-06)
 
 
