@@ -1320,83 +1320,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 // List available prompts (exposed as slash commands in Claude Code)
+// NOTE: Prefer .claude/commands/ files for slash commands — they show as clean
+// "/command" names. MCP prompts get prefixed as "/glancey:command (MCP)" which
+// is confusing. The init_project tool installs commands as .claude/commands/ files.
 server.setRequestHandler(ListPromptsRequestSchema, async () => {
   return {
-    prompts: [
-      {
-        name: 'init_project',
-        description:
-          'Initialize glancey in this project - sets up CLAUDE.md, post-commit hook, and /glancey slash command',
-      },
-      {
-        name: 'glancey',
-        description:
-          'Remind yourself to use glancey semantic code tools instead of grep/find/manual exploration',
-      },
-    ],
+    prompts: [],
   };
 });
 
 // Handle prompt requests
+// MCP prompts are no longer used for slash commands (they show as "/glancey:command (MCP)").
+// Slash commands are installed as .claude/commands/ files by init_project instead.
 server.setRequestHandler(GetPromptRequestSchema, async (request) => {
   const { name } = request.params;
-
-  switch (name) {
-    case 'init_project':
-      return {
-        messages: [
-          {
-            role: 'user' as const,
-            content: {
-              type: 'text',
-              text: 'Run the `init_project` tool now to set up glancey in this project. This will configure CLAUDE.md with glancey usage instructions, install a post-commit hook, and add a /glancey slash command.',
-            },
-          },
-        ],
-      };
-
-    case 'glancey':
-      return {
-        messages: [
-          {
-            role: 'user' as const,
-            content: {
-              type: 'text',
-              text: `You have **glancey** MCP tools available. Stop and switch to them now.
-
-## Instead of grep/ripgrep/find, use:
-
-| Instead of... | Use this glancey tool |
-|---|---|
-| \`grep\`/\`rg\` for searching code | **\`search_code\`** - natural language semantic search |
-| \`find\`/\`fd\`/\`glob\` for finding files | **\`search_code\`** or **\`find_symbol\`** |
-| Reading many files to understand code | **\`summarize_codebase\`** + **\`list_concepts\`** |
-| Searching for a function/class name | **\`find_symbol\`** (supports glob patterns) |
-| Checking who calls a function | **\`find_referencing_symbols\`** |
-| Regex search across files | **\`search_for_pattern\`** |
-| Writing code that might already exist | **\`search_similar\`** first |
-| Raw \`git commit\` | **\`commit\`** tool (validates branch, message format) |
-
-## Quick reference
-
-- **Explore unfamiliar code**: \`summarize_codebase\` → \`list_concepts\` → \`search_by_concept\`
-- **Find code by concept**: \`search_code("how does auth work")\`
-- **Find similar patterns**: \`search_similar(code="snippet")\` or \`search_similar(filepath="file.ts", startLine=10, endLine=25)\`
-- **Understand a file**: \`get_symbols_overview(filepath="file.ts")\`
-- **Edit symbols**: \`replace_symbol_body\`, \`insert_before_symbol\`, \`insert_after_symbol\`, \`rename_symbol\`
-- **Save context for later**: \`write_memory\` / \`read_memory\`
-
-## Check index health
-
-If results seem stale, run \`get_index_status\` and \`index_codebase\` if needed.`,
-            },
-          },
-        ],
-      };
-
-    default:
-      throw new GlanceyError(`Unknown prompt: ${name}`, 'validation', { prompt: name });
-  }
+  throw new GlanceyError(`Unknown prompt: ${name}`, 'validation', { prompt: name });
 });
 
 // Handle tool calls

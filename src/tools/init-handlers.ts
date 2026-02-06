@@ -96,7 +96,7 @@ This project uses **glancey** MCP for semantic code search and codebase understa
  */
 const GLANCEY_SLASH_COMMAND = `---
 name: glancey
-description: Remind yourself to use glancey's semantic code tools instead of grep/find/manual exploration
+description: Show glancey tool usage tips and quick reference
 ---
 
 # Use Glancey
@@ -128,6 +128,34 @@ You have **glancey** MCP tools available. Stop and switch to them now.
 ## Check index health
 
 If results seem stale, run \`get_index_status\` and \`index_codebase\` if needed.
+`;
+
+/**
+ * Template for .claude/commands/dashboard.md slash command
+ */
+const DASHBOARD_SLASH_COMMAND = `---
+name: dashboard
+description: Open the glancey dashboard in the browser
+---
+
+Open the glancey dashboard using the \`mcp__glancey__open_dashboard\` tool with \`force: true\` to bypass the cooldown.
+
+The tool will return the actual URL where the dashboard is running (port may vary if 24300 is already in use by another instance).
+`;
+
+/**
+ * Template for .claude/commands/init-project.md slash command
+ */
+const INIT_PROJECT_SLASH_COMMAND = `---
+name: init-project
+description: Set up glancey in this project
+---
+
+Run the \`init_project\` tool now to set up glancey in this project. This will:
+
+1. Create or update **CLAUDE.md** with glancey usage instructions
+2. Install a **post-commit hook** that warns when commits bypass the \`commit\` tool
+3. Add **/glancey slash command** for quick reminders to use glancey tools
 `;
 
 /**
@@ -277,24 +305,38 @@ function installPostCommitHook(projectPath: string): {
 }
 
 /**
- * Install the /glancey slash command into .claude/commands/
+ * Slash commands to install into .claude/commands/
  */
-function installSlashCommand(projectPath: string): { installed: boolean; skipped: boolean } {
-  const commandsDir = path.join(projectPath, '.claude', 'commands');
-  const skillPath = path.join(commandsDir, 'glancey.md');
+const SLASH_COMMANDS: { filename: string; content: string }[] = [
+  { filename: 'glancey.md', content: GLANCEY_SLASH_COMMAND },
+  { filename: 'dashboard.md', content: DASHBOARD_SLASH_COMMAND },
+  { filename: 'init-project.md', content: INIT_PROJECT_SLASH_COMMAND },
+];
 
-  // Check if it already exists
-  if (fs.existsSync(skillPath)) {
-    return { installed: false, skipped: true };
-  }
+/**
+ * Install slash commands into .claude/commands/
+ */
+function installSlashCommands(projectPath: string): { installed: string[]; skipped: string[] } {
+  const commandsDir = path.join(projectPath, '.claude', 'commands');
+  const installed: string[] = [];
+  const skipped: string[] = [];
 
   // Ensure .claude/commands/ directory exists
   if (!fs.existsSync(commandsDir)) {
     fs.mkdirSync(commandsDir, { recursive: true });
   }
 
-  fs.writeFileSync(skillPath, GLANCEY_SLASH_COMMAND);
-  return { installed: true, skipped: false };
+  for (const cmd of SLASH_COMMANDS) {
+    const cmdPath = path.join(commandsDir, cmd.filename);
+    if (fs.existsSync(cmdPath)) {
+      skipped.push(cmd.filename);
+    } else {
+      fs.writeFileSync(cmdPath, cmd.content);
+      installed.push(cmd.filename);
+    }
+  }
+
+  return { installed, skipped };
 }
 
 /**
@@ -347,19 +389,22 @@ export async function handleInitProject(context: InitToolContext): Promise<ToolR
     result.messages.push(`✗ Failed to install hook: ${error}`);
   }
 
-  // Install /glancey slash command
+  // Install slash commands (/glancey, /dashboard, /init-project)
   try {
-    const skillResult = installSlashCommand(context.projectPath);
-    result.skillInstalled = skillResult.installed;
-    result.skillSkipped = skillResult.skipped;
+    const cmdResult = installSlashCommands(context.projectPath);
+    result.skillInstalled = cmdResult.installed.length > 0;
+    result.skillSkipped = cmdResult.skipped.length > 0 && cmdResult.installed.length === 0;
 
-    if (skillResult.installed) {
-      result.messages.push('✓ Installed /glancey slash command at .claude/commands/glancey.md');
-    } else if (skillResult.skipped) {
-      result.messages.push('• /glancey slash command already installed');
+    if (cmdResult.installed.length > 0) {
+      const names = cmdResult.installed.map((f) => `/${f.replace('.md', '')}`).join(', ');
+      result.messages.push(`✓ Installed slash commands: ${names}`);
+    }
+    if (cmdResult.skipped.length > 0) {
+      const names = cmdResult.skipped.map((f) => `/${f.replace('.md', '')}`).join(', ');
+      result.messages.push(`• Already installed: ${names}`);
     }
   } catch (error) {
-    result.messages.push(`✗ Failed to install slash command: ${error}`);
+    result.messages.push(`✗ Failed to install slash commands: ${error}`);
   }
 
   // Build response
@@ -372,7 +417,7 @@ export async function handleInitProject(context: InitToolContext): Promise<ToolR
   }
 
   if (result.skillInstalled) {
-    nextSteps.push('- Commit .claude/commands/glancey.md so team members get the /glancey command');
+    nextSteps.push('- Commit .claude/commands/ so team members get the slash commands');
   }
 
   if (result.hookInstalled && !usesHusky(context.projectPath)) {
@@ -391,7 +436,7 @@ ${nextSteps.length > 0 ? '## Next Steps\n\n' + nextSteps.join('\n') : ''}
 
 1. **CLAUDE.md** - Added comprehensive instructions for agents to use glancey tools
 2. **Post-commit hook** - Warns when commits bypass the glancey commit tool
-3. **/glancey command** - Type \`/glancey\` anytime to remind the agent to use glancey tools
+3. **Slash commands** - \`/glancey\` (usage tips), \`/dashboard\` (open UI), \`/init-project\` (setup)
 
 Agents will now see glancey usage instructions when working in this project.`;
 
