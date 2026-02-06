@@ -1,3 +1,10 @@
+## [Unreleased]
+
+
+### Features
+
+* add /init_project and /glancey as MCP prompts for all glancey users
+
 # [2.5.0](https://github.com/nicholaspsmith/glancey/compare/v2.4.1...v2.5.0) (2026-02-06)
 
 
