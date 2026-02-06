@@ -1,3 +1,10 @@
+# [2.7.0](https://github.com/nicholaspsmith/glancey/compare/v2.6.0...v2.7.0) (2026-02-06)
+
+
+### Features
+
+* use .claude/commands/ for clean slash command names ([c6e2c12](https://github.com/nicholaspsmith/glancey/commit/c6e2c1245824f1ffb57f1802275c955a40d47f61))
+
 # [2.6.0](https://github.com/nicholaspsmith/glancey/compare/v2.5.0...v2.6.0) (2026-02-06)
 
 
