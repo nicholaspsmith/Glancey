@@ -1,3 +1,10 @@
+# [2.6.0](https://github.com/nicholaspsmith/glancey/compare/v2.5.0...v2.6.0) (2026-02-06)
+
+
+### Features
+
+* add /init_project and /glancey as MCP prompts ([c406865](https://github.com/nicholaspsmith/glancey/commit/c406865e9aec6e845eb3cb8d5dba650f3a75dd53))
+
 ## [Unreleased]
 
 
