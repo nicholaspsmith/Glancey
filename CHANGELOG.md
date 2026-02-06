@@ -1,3 +1,10 @@
+# [2.3.0](https://github.com/nicholaspsmith/glancey/compare/v2.2.1...v2.3.0) (2026-02-06)
+
+
+### Features
+
+* add pagination, search, and filtering to beads panel ([#140](https://github.com/nicholaspsmith/glancey/issues/140)) ([1bce3c9](https://github.com/nicholaspsmith/glancey/commit/1bce3c9f2468ae7508d18aff715f8201f22bcc07))
+
 ## [2.2.1](https://github.com/nicholaspsmith/glancey/compare/v2.2.0...v2.2.1) (2026-02-03)
 
 
