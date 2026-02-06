@@ -68,11 +68,22 @@ After installing Glancey, run `/init_project` in Claude Code to set up your proj
 This creates:
 - **CLAUDE.md** - Instructions for AI agents on how to use Glancey tools
 - **Post-commit hook** - Warns when commits bypass the `commit` tool
-- **Slash commands** - `/glancey`, `/dashboard`, and `/init-project`
+- **Slash commands** - `/glancey`, `/dashboard`, `/agents`, and `/init-project`
 
 The hook is installed in `.husky/` if you use Husky, otherwise in `.git/hooks/`.
 
 > **Tip:** If your agent isn't using Glancey tools (falling back to grep/find instead), run `/glancey` to remind it. When launching new agents (subagents, worktrees, etc.), tell them to run `/glancey` before starting their task so they know to use Glancey's semantic search instead of manual exploration.
+
+### Slash Commands
+
+Glancey installs the following slash commands into `.claude/commands/` for use in Claude Code:
+
+| Command | Description |
+|---------|-------------|
+| `/glancey` | Show glancey tool usage tips and quick reference. Use this to remind agents to use semantic search instead of grep/find. |
+| `/dashboard` | Open the glancey web dashboard in the browser for real-time monitoring of index status, token savings, and usage. |
+| `/agents` | Launch 1-10 parallel Claude Code agents, each working autonomously on a [beads](https://github.com/steveyegge/beads) task in its own git worktree. Supports `--auto-merge`, `--count N`, `--model MODEL`, and `--budget N` flags. |
+| `/init-project` | Initialize glancey in the current project — sets up CLAUDE.md, post-commit hook, and slash commands. |
 
 ### Project-Level Installation
 
