@@ -68,9 +68,11 @@ After installing Glancey, run `/init_project` in Claude Code to set up your proj
 This creates:
 - **CLAUDE.md** - Instructions for AI agents on how to use Glancey tools
 - **Post-commit hook** - Warns when commits bypass the `commit` tool
-- **/glancey command** - Type `/glancey` anytime to remind the agent to use Glancey tools
+- **Slash commands** - `/glancey`, `/dashboard`, and `/init-project`
 
 The hook is installed in `.husky/` if you use Husky, otherwise in `.git/hooks/`.
+
+> **Tip:** If your agent isn't using Glancey tools (falling back to grep/find instead), run `/glancey` to remind it. When launching new agents (subagents, worktrees, etc.), tell them to run `/glancey` before starting their task so they know to use Glancey's semantic search instead of manual exploration.
 
 ### Project-Level Installation
 
