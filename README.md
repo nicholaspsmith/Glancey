@@ -59,15 +59,16 @@ In Claude Code, run `/mcp` to see Glancey in the list of MCP servers.
 
 ### Initialize Your Project (Recommended)
 
-After installing Glancey, run `init_project` in your project to set up agent instructions:
+After installing Glancey, run `/init_project` in Claude Code to set up your project:
 
 ```
-> init_project
+/init_project
 ```
 
 This creates:
 - **CLAUDE.md** - Instructions for AI agents on how to use Glancey tools
 - **Post-commit hook** - Warns when commits bypass the `commit` tool
+- **/glancey command** - Type `/glancey` anytime to remind the agent to use Glancey tools
 
 The hook is installed in `.husky/` if you use Husky, otherwise in `.git/hooks/`.
 
