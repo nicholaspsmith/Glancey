@@ -1040,7 +1040,7 @@ export function getDashboardHTML(): string {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
-      padding: 6px 12px;
+      padding: 0;
       border-bottom: 1px solid var(--border-color);
       align-items: center;
       box-sizing: border-box;
@@ -2583,7 +2583,7 @@ export function getDashboardHTML(): string {
     var beadsCurrentView = 'ready';
     var allBeadsIssues = [];
     var beadsCurrentPage = 1;
-    var BEADS_PAGE_SIZE = 20;
+    var BEADS_PAGE_SIZE = 10;
 
     function getBeadsViewIssues() {
       if (beadsCurrentView === 'open') return beadsData.openIssues;
