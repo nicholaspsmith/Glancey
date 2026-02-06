@@ -2583,7 +2583,7 @@ export function getDashboardHTML(): string {
     var beadsCurrentView = 'ready';
     var allBeadsIssues = [];
     var beadsCurrentPage = 1;
-    var BEADS_PAGE_SIZE = 20;
+    var BEADS_PAGE_SIZE = 10;
 
     function getBeadsViewIssues() {
       if (beadsCurrentView === 'open') return beadsData.openIssues;
