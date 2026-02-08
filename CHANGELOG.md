@@ -1,3 +1,11 @@
+# [2.9.0](https://github.com/nicholaspsmith/glancey/compare/v2.8.2...v2.9.0) (2026-02-08)
+
+
+### Features
+
+* add .mcp.json creation to project init ([3da29d5](https://github.com/nicholaspsmith/glancey/commit/3da29d5f15acf603ea201153ce5c739f0b20c3a4))
+* add npx glancey init CLI subcommand ([0e32ea2](https://github.com/nicholaspsmith/glancey/commit/0e32ea247963729348eab0bfdbb1804a29f978ac))
+
 ## [2.8.2](https://github.com/nicholaspsmith/glancey/compare/v2.8.1...v2.8.2) (2026-02-08)
 
 
