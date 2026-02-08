@@ -1,3 +1,10 @@
+## [2.8.2](https://github.com/nicholaspsmith/glancey/compare/v2.8.1...v2.8.2) (2026-02-08)
+
+
+### Bug Fixes
+
+* support --agent flag for reusable agent definitions in /agents ([#149](https://github.com/nicholaspsmith/glancey/issues/149)) ([af82a1f](https://github.com/nicholaspsmith/glancey/commit/af82a1faffb979a47b8bd0916d6fa09e35199fd7))
+
 ## [2.8.1](https://github.com/nicholaspsmith/glancey/compare/v2.8.0...v2.8.1) (2026-02-06)
 
 # [2.8.0](https://github.com/nicholaspsmith/glancey/compare/v2.7.0...v2.8.0) (2026-02-06)
