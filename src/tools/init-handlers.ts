@@ -216,6 +216,53 @@ fi
 `;
 
 /**
+ * Install or update .mcp.json with glancey server entry
+ */
+function installMcpConfig(projectPath: string): {
+  created: boolean;
+  updated: boolean;
+  skipped: boolean;
+} {
+  const mcpJsonPath = path.join(projectPath, '.mcp.json');
+  const glanceyEntry = {
+    command: 'npx',
+    args: ['-y', 'glancey@latest'],
+  };
+
+  if (fs.existsSync(mcpJsonPath)) {
+    try {
+      const content = fs.readFileSync(mcpJsonPath, 'utf-8');
+      const config = JSON.parse(content);
+
+      // Check if glancey entry already exists
+      if (config.mcpServers?.glancey) {
+        return { created: false, updated: false, skipped: true };
+      }
+
+      // Add glancey entry to existing config
+      if (!config.mcpServers) {
+        config.mcpServers = {};
+      }
+      config.mcpServers.glancey = glanceyEntry;
+      fs.writeFileSync(mcpJsonPath, JSON.stringify(config, null, 2) + '\n');
+      return { created: false, updated: true, skipped: false };
+    } catch {
+      // If JSON parsing fails, don't overwrite the file
+      return { created: false, updated: false, skipped: true };
+    }
+  }
+
+  // Create new .mcp.json
+  const config = {
+    mcpServers: {
+      glancey: glanceyEntry,
+    },
+  };
+  fs.writeFileSync(mcpJsonPath, JSON.stringify(config, null, 2) + '\n');
+  return { created: true, updated: false, skipped: false };
+}
+
+/**
  * Context for init tools.
  */
 export interface InitToolContext {
@@ -233,6 +280,9 @@ interface InitResult {
   hookSkipReason?: string;
   skillInstalled: boolean;
   skillSkipped: boolean;
+  mcpConfigCreated: boolean;
+  mcpConfigUpdated: boolean;
+  mcpConfigSkipped: boolean;
   messages: string[];
 }
 
@@ -379,6 +429,9 @@ export async function handleInitProject(context: InitToolContext): Promise<ToolR
     hookSkipped: false,
     skillInstalled: false,
     skillSkipped: false,
+    mcpConfigCreated: false,
+    mcpConfigUpdated: false,
+    mcpConfigSkipped: false,
     messages: [],
   };
 
@@ -436,6 +489,24 @@ export async function handleInitProject(context: InitToolContext): Promise<ToolR
     result.messages.push(`✗ Failed to install slash commands: ${error}`);
   }
 
+  // Install .mcp.json with glancey server entry
+  try {
+    const mcpResult = installMcpConfig(context.projectPath);
+    result.mcpConfigCreated = mcpResult.created;
+    result.mcpConfigUpdated = mcpResult.updated;
+    result.mcpConfigSkipped = mcpResult.skipped;
+
+    if (mcpResult.created) {
+      result.messages.push('✓ Created .mcp.json with glancey MCP server entry');
+    } else if (mcpResult.updated) {
+      result.messages.push('✓ Added glancey entry to existing .mcp.json');
+    } else {
+      result.messages.push('• .mcp.json already contains glancey entry');
+    }
+  } catch (error) {
+    result.messages.push(`✗ Failed to install .mcp.json: ${error}`);
+  }
+
   // Build response
   const summary = result.messages.join('\n');
   const nextSteps: string[] = [];
@@ -455,6 +526,10 @@ export async function handleInitProject(context: InitToolContext): Promise<ToolR
     );
   }
 
+  if (result.mcpConfigCreated || result.mcpConfigUpdated) {
+    nextSteps.push('- Commit .mcp.json so Claude Code auto-discovers glancey');
+  }
+
   const response = `# Glancey Project Initialization
 
 ${summary}
@@ -466,6 +541,7 @@ ${nextSteps.length > 0 ? '## Next Steps\n\n' + nextSteps.join('\n') : ''}
 1. **CLAUDE.md** - Added comprehensive instructions for agents to use glancey tools
 2. **Post-commit hook** - Warns when commits bypass the glancey commit tool
 3. **Slash commands** - \`/glancey\` (usage tips), \`/dashboard\` (open UI), \`/init-project\` (setup)
+4. **.mcp.json** - Configured glancey MCP server for auto-discovery by Claude Code
 
 Agents will now see glancey usage instructions when working in this project.`;
 
