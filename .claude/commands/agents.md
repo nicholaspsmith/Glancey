@@ -20,8 +20,9 @@ Parse the following flags from `$ARGUMENTS` (all optional):
 |------|---------|-------------|
 | `--auto-merge` | off | Agents auto-merge PRs after CI passes |
 | `--count N` | (interactive) | Max number of tasks to select |
-| `--model MODEL` | `sonnet` | Model for spawned agents |
+| `--model MODEL` | `sonnet` | Model for spawned agents (ignored when `--agent` is set, since the agent definition specifies its own model) |
 | `--budget N` | `5` | Max USD per agent |
+| `--agent NAME` | (none) | Use an existing agent definition from `.claude/agents/NAME.md`. Multiple instances of the same agent run concurrently — the file is a reusable template, not a per-instance resource. |
 
 Then fetch available tasks:
 
@@ -58,7 +59,7 @@ Will launch 3 agents:
   2. [BD-456] Add pagination to /api/users
   3. [BD-789] Update error messages for form validation
 
-Model: sonnet | Budget: $5/agent | Auto-merge: off
+Agent: parallel-task-worker | Model: sonnet | Budget: $5/agent | Auto-merge: off
 
 Proceed? (y/n)
 ```
@@ -84,11 +85,13 @@ For each selected task:
 
 ## Phase 4 — Spawn Agents
 
+**CRITICAL: NEVER create files in `.claude/agents/`.** Agent definitions are reusable templates — the same definition supports multiple concurrent instances. If `--agent` is specified, the file MUST already exist. If it doesn't, tell the user and stop.
+
 For each worktree, do the following:
 
-### 4a. Write agent prompt to temp file
+### 4a. Write task-specific prompt to temp file
 
-Write the agent prompt (see below) to `/tmp/agent-prompt-{task_id}.txt`. This avoids shell argument length limits.
+Write the task-specific prompt (see Agent Prompt Template below) to `/tmp/agent-prompt-{task_id}.txt`. This avoids shell argument length limits.
 
 ### 4b. Build MCP config
 
@@ -109,6 +112,21 @@ Create an inline MCP config JSON that points glancey at the worktree. Write it t
 ```
 
 ### 4c. Launch the agent
+
+**If `--agent NAME` was provided** — use the existing agent definition. Each launch creates a new *instance* of the same agent; the `.claude/agents/NAME.md` file is a shared template:
+
+```bash
+claude --agent {agent_name} \
+  --permission-mode bypassPermissions \
+  --max-budget-usd {budget} \
+  --mcp-config /tmp/agent-mcp-{task_id}.json \
+  -p "$(cat /tmp/agent-prompt-{task_id}.txt)" \
+  > /tmp/agent-{task_id}.log 2>&1 &
+```
+
+Note: `--model` is omitted because the agent definition specifies its own model. `--max-budget-usd` still applies as a per-instance cap.
+
+**If no `--agent` flag** — use inline prompt mode:
 
 ```bash
 cat /tmp/agent-prompt-{task_id}.txt | claude -p \
