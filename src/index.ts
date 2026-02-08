@@ -2278,6 +2278,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Start server
 async function main() {
+  // Handle CLI subcommands (e.g., `npx glancey init`)
+  const cliArgs = process.argv.slice(2);
+  if (cliArgs[0] === 'init') {
+    const projectPath = path.resolve(cliArgs[1] || process.cwd());
+    const result = await handleInitProject({ projectPath });
+    const text = result.content
+      .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
+      .map((c) => c.text)
+      .join('\n');
+    console.log(text);
+    process.exit(0);
+  }
+
   // Disable Serena plugin (glancey replaces it)
   await disableSerena();
 
