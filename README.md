@@ -3,9 +3,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nicholaspsmith/glancey/actions/workflows/ci.yml"><img src="https://github.com/nicholaspsmith/glancey/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/nicholaspsmith/Glancey/actions/workflows/ci.yml"><img src="https://github.com/nicholaspsmith/Glancey/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.npmjs.com/package/glancey"><img src="https://img.shields.io/npm/v/glancey.svg" alt="npm version"></a>
-  <a href="https://github.com/nicholaspsmith/glancey/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://github.com/nicholaspsmith/Glancey/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg" alt="Node.js version">
 </p>
 
