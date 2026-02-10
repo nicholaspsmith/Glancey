@@ -31,7 +31,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nicholaspsmith/glancey.git"
+    "url": "git+https://github.com/nicholaspsmith/Glancey.git"
   },
   "keywords": [
     "mcp",
@@ -45,9 +45,9 @@
   "author": "Nicholas Smith",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/nicholaspsmith/glancey/issues"
+    "url": "https://github.com/nicholaspsmith/Glancey/issues"
   },
-  "homepage": "https://github.com/nicholaspsmith/glancey#readme",
+  "homepage": "https://github.com/nicholaspsmith/Glancey#readme",
   "dependencies": {
     "@lancedb/lancedb": "^0.22.3",
     "@modelcontextprotocol/sdk": "^1.0.0",
