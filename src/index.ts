@@ -2291,6 +2291,11 @@ async function main() {
     process.exit(0);
   }
 
+  // Connect MCP transport immediately so Claude Code doesn't block waiting for us
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error('[glancey] MCP server started');
+
   // Disable Serena plugin (glancey replaces it)
   await disableSerena();
 
@@ -2380,10 +2385,6 @@ async function main() {
   } else {
     console.error('[glancey] Dashboard disabled in config');
   }
-
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error('[glancey] MCP server started');
 }
 
 /**
