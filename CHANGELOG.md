@@ -1,3 +1,10 @@
+## [2.9.2](https://github.com/nicholaspsmith/Glancey/compare/v2.9.1...v2.9.2) (2026-02-10)
+
+
+### Bug Fixes
+
+* update repository URLs to match renamed Glancey casing ([#151](https://github.com/nicholaspsmith/Glancey/issues/151)) ([e139ecd](https://github.com/nicholaspsmith/Glancey/commit/e139ecd7211298acc3147e727a91218b31dfc6d2))
+
 ## [2.9.1](https://github.com/nicholaspsmith/glancey/compare/v2.9.0...v2.9.1) (2026-02-10)
 
 
