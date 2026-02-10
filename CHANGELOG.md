@@ -1,3 +1,10 @@
+## [2.9.3](https://github.com/nicholaspsmith/Glancey/compare/v2.9.2...v2.9.3) (2026-02-10)
+
+
+### Bug Fixes
+
+* eliminate 30-second startup hang in MCP server ([#152](https://github.com/nicholaspsmith/Glancey/issues/152)) ([205723d](https://github.com/nicholaspsmith/Glancey/commit/205723de197871d68cc68861d82f7083acbc89a0))
+
 ## [2.9.2](https://github.com/nicholaspsmith/Glancey/compare/v2.9.1...v2.9.2) (2026-02-10)
 
 
