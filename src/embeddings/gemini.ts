@@ -50,9 +50,32 @@ export class GeminiBackend implements EmbeddingBackend {
   }
 
   async initialize(): Promise<void> {
-    // Test API key with a small request
+    // Health check: verify API key with a lightweight request (no retries, short timeout)
     try {
-      await this.embed('test');
+      const url = `${this.baseUrl}/models/${this.model}:embedContent`;
+      const response = await fetchWithRetry(
+        url,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': this.apiKey,
+          },
+          body: JSON.stringify({
+            model: `models/${this.model}`,
+            content: {
+              parts: [{ text: 'test' }],
+            },
+            outputDimensionality: this.dimensions,
+          }),
+        },
+        { maxRetries: 0, timeoutMs: 5000 }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Gemini API error: ${response.status} - ${error}`);
+      }
     } catch (error) {
       throw new Error(`Failed to initialize Gemini backend: ${error}`);
     }

@@ -49,7 +49,11 @@ export class OllamaBackend implements EmbeddingBackend {
   async initialize(): Promise<void> {
     // Test connection and check if model is available
     try {
-      const response = await fetchWithRetry(`${this.baseUrl}/api/tags`, {});
+      const response = await fetchWithRetry(
+        `${this.baseUrl}/api/tags`,
+        {},
+        { maxRetries: 0, timeoutMs: 5000 }
+      );
       if (!response.ok) {
         throw new Error(`Ollama server returned ${response.status}`);
       }
