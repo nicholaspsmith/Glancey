@@ -11,6 +11,8 @@
 
 # Glancey
 
+> **This project has been sunset.** Improvements in Claude's underlying models have made the semantic code search capabilities that Glancey provided no longer necessary. Claude Code now handles codebase understanding well enough on its own that an external indexing layer adds little value. The package will remain available on npm for existing users, but no further development or maintenance is planned. Thank you to everyone who tried it out!
+
 An MCP plugin that adds semantic code search to Claude Code and other AI coding agents, giving them deep context from your entire codebase.
 
 ## Features
