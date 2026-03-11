@@ -1,3 +1,5 @@
+## [2.9.4](https://github.com/nicholaspsmith/Glancey/compare/v2.9.3...v2.9.4) (2026-03-11)
+
 ## [2.9.3](https://github.com/nicholaspsmith/Glancey/compare/v2.9.2...v2.9.3) (2026-02-10)
 
 
